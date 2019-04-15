@@ -1,0 +1,10 @@
+*.log
+*.pyc
+*.pickle
+
+stats.py
+
+example/
+example2/
+build/
+__pycache__/
