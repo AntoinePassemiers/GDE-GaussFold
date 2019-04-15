@@ -12,6 +12,7 @@ class Optimizer:
         self.L = len(initial_coords)
         self.initial_coords = initial_coords
         self.obj = obj
+        self.scores = list()
 
     def random_sol(self):
         offsets = np.random.normal(0., 10., size=(self.L, 3))
@@ -25,7 +26,7 @@ class Optimizer:
         mutations *= np.random.randint(0, 2, size=(len(left), 1))
         return s + mutations
 
-    def new_sol(self, pop, scores):
+    def new_sol(self, pop, scores, ps=50):
         pop = [_ for _ in pop]
         np.copy(scores)
         indices = np.arange(len(pop))
@@ -33,23 +34,29 @@ class Optimizer:
         pop = [pop[i] for i in indices]
         scores = scores[indices]
 
-        ps = 20 # Partition size
         left_winner = pop[np.argmax(scores[:ps])]
         right_winner = pop[ps + np.argmax(scores[ps:])]
 
         return self.cross_over(left_winner, right_winner)
 
-    def run(self, pop_size=500, n_iter=100000):
+    def run(self, pop_size=2000, n_iter=100000, partition_size=50):
         pop = [self.random_sol() for i in range(pop_size-1)]
         pop.append(self.initial_coords)
 
+        self.scores = list()
+        best_score = self.obj(pop[-1])
+
         scores = np.asarray([self.obj(ind) for ind in pop])
         for k in range(n_iter):
-            new_ind = self.new_sol(pop, scores)
+            new_ind = self.new_sol(pop, scores, ps=partition_size)
             worst = np.argmin(scores)
             pop[worst] = new_ind
             scores[worst] = self.obj(new_ind)
             print(scores[worst])
+
+            if scores[worst] > best_score:
+                best_score = scores[worst]
+            self.scores.append(best_score)
 
         best_coords = pop[np.argmax(scores)]
         return best_coords

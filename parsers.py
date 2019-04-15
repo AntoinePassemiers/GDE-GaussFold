@@ -39,7 +39,7 @@ class Parser:
 class PairsParser(Parser):
 
     def getSupportedExtensions(self):
-        return list()
+        return []
 
     def __parse_pairs__(self, filepath, delimiter=',', target_col=2, column_names=list(), sequence_length=None):
         assert("target" in column_names)

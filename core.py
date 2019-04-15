@@ -15,7 +15,7 @@ from model import Model
 from optimizer import Optimizer
 
 
-class GDFuzz3D:
+class GaussFold:
 
     def __init__(self, n_runs=100, max_n_iter=300, eps=1e-3):
         self.n_runs = n_runs
@@ -129,24 +129,33 @@ class GDFuzz3D:
                 elif (ssp[i] == 0 and ssp[j] == 1) or (ssp[i] == 1 and ssp[j] == 0):
                     if gds[i, j] == 1 and sep >= 4: # Alpha/beta contact
                         model.add_restraint(i, j, 6.05, 0.95)
+                elif (ssp[i] == 0 and ssp[j] == 2) or (ssp[i] == 2 and ssp[j] == 0):
+                    if gds[i, j] == 1 and sep >= 4: # Helix/coil contact
+                        model.add_restraint(i, j, 6.60, 0.92)
+                elif (ssp[i] == 1 and ssp[j] == 2) or (ssp[i] == 2 and ssp[j] == 1):
+                    if gds[i, j] == 1 and sep >= 4: # Beta/coil contact
+                        model.add_restraint(i, j, 6.44, 1.00)
         return model
 
 
 
-sequence = FastaParser().parse('example2/sequence.fa')['sequences'][0]
+sequence = FastaParser().parse('example3/sequence.fa')['sequences'][0]
 print(sequence)
 
-ssp = SS3Parser().parse('example2/ss3.txt').argmax(axis=1)
+ssp = SS3Parser().parse('example3/ss3.txt').argmax(axis=1)
 
 print(ssp)
 
-sequence_name = '1F68A'
+sequence_name = '1A3AA'
 distances, coords_target = PDBParser(sequence, sequence_name,
-    method='CA').parse('example2/native.pdb')
-sigmoid = lambda x: 1. / (1. + np.exp(-x))
-cmap = 1. - sigmoid(distances - 8.)
+    method='CA').parse('example3/native.pdb')
 
-gdfuzz = GDFuzz3D()
+L = len(ssp)
+sigmoid = lambda x: 1. / (1. + np.exp(-x))
+cmap = np.squeeze(sigmoid(PredictionFileParser(L, ',').parse('example3/sequence.fa.jackhmmer4.plmdca2')))
+#cmap = 1. - sigmoid(distances - 8.)
+
+gdfuzz = GaussFold()
 coords_predicted = gdfuzz.to_coords(cmap, ssp)
 
 print('Compute TM-score')
