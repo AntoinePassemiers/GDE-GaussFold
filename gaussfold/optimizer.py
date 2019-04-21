@@ -24,7 +24,8 @@ class Optimizer:
         s = alpha * left + (1. - alpha) * right
         mutations = np.random.normal(0., 0.3, size=(self.L, 3))
         mutations *= np.random.randint(0, 2, size=(len(left), 1))
-        return s + mutations
+        individual = s + mutations
+        return individual
 
     def new_sol(self, pop, scores, ps=50):
         pop = [_ for _ in pop]
@@ -39,12 +40,15 @@ class Optimizer:
 
         return self.cross_over(left_winner, right_winner)
 
-    def run(self, pop_size=2000, n_iter=100000, partition_size=50):
+    def run(self, pop_size=2000, n_iter=100000, partition_size=50,
+            early_stopping=2, verbose=True):
         pop = [self.random_sol() for i in range(pop_size-1)]
         pop.append(self.initial_coords)
 
         self.scores = list()
         best_score = self.obj(pop[-1])
+
+        best_iteration = 0
 
         scores = np.asarray([self.obj(ind) for ind in pop])
         for k in range(n_iter):
@@ -52,11 +56,17 @@ class Optimizer:
             worst = np.argmin(scores)
             pop[worst] = new_ind
             scores[worst] = self.obj(new_ind)
-            print(scores[worst])
 
             if scores[worst] > best_score:
                 best_score = scores[worst]
+                best_iteration = k
+            if verbose and (k + 1) % 100 == 0:
+                print('Log-likelihood at iteration %i: %f' \
+                    % (k + 1, best_score))
             self.scores.append(best_score)
+
+            if k - best_iteration >= early_stopping:
+                break
 
         best_coords = pop[np.argmax(scores)]
         return best_coords

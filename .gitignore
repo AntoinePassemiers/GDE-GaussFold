@@ -4,8 +4,7 @@
 
 stats.py
 
-example2/
-example3/
-example4/
+dist/
 build/
 __pycache__/
+gaussfold.egg-info

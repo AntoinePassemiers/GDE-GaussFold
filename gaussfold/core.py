@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
-# gdfuzz3d.py
+# core.py: GDE-GaussFold core algorithm
 # author : Antoine Passemiers
+
+from gaussfold.corrector import DeviationCorrector
+from gaussfold.model import Model
+from gaussfold.optimizer import Optimizer
 
 import numpy as np
 import random
@@ -8,21 +12,29 @@ from sklearn.manifold import MDS
 import networkx as nx
 from networkx.algorithms.shortest_paths.generic import shortest_path_length
 
-from corrector import DeviationCorrector
-from metrics import tm_score
-from parsers import *
-from model import Model
-from optimizer import Optimizer
-
 
 class GaussFold:
+    """GDE-GaussFold base class.
 
-    def __init__(self, n_runs=100, max_n_iter=300, eps=1e-3):
+    Attributes:
+        n_runs (int): Number of times to run Multi-Dimensional
+            Scaling algorithm from scratch.
+        max_n_iter (int): Maximum number of iterations of
+            Multi-Dimensional Scaling algorithm.
+        eps (float): Convergence threshold of Multi-Dimensional
+            Scaling algorithm.
+    """
+
+    def __init__(self, n_runs=1, max_n_iter=300, eps=1e-3):
+        """
+        """
         self.n_runs = n_runs
         self.max_n_iter = max_n_iter
         self.eps = eps
+        self.model = None
+        self.optimizer = None
 
-    def to_coords(self, cmap, ssp):
+    def run(self, cmap, ssp):
 
         L = len(cmap)
 
@@ -80,11 +92,12 @@ class GaussFold:
         corrector = DeviationCorrector(L)
         X_transformed = corrector.fit_transform(X_transformed)
 
-        model = self.create_model(gds, ssp)
+        if not isinstance(self.model, Model):
+            self.model = self.create_model(gds, ssp)
 
-        optimizer = Optimizer(X_transformed, model.evaluate)
-        best_coords = optimizer.run(n_iter=100000)
-
+        if not isinstance(self.optimizer, Optimizer):
+            self.optimizer = Optimizer(X_transformed, self.model.evaluate)
+        best_coords = self.optimizer.run(n_iter=100000)
         return best_coords
 
     def create_model(self, gds, ssp):
@@ -136,27 +149,3 @@ class GaussFold:
                     if gds[i, j] == 1 and sep >= 4: # Beta/coil contact
                         model.add_restraint(i, j, 6.44, 1.00)
         return model
-
-
-
-sequence = FastaParser().parse('example3/sequence.fa')['sequences'][0]
-print(sequence)
-
-ssp = SS3Parser().parse('example3/ss3.txt').argmax(axis=1)
-
-print(ssp)
-
-sequence_name = '1A3AA'
-distances, coords_target = PDBParser(sequence, sequence_name,
-    method='CA').parse('example3/native.pdb')
-
-L = len(ssp)
-sigmoid = lambda x: 1. / (1. + np.exp(-x))
-cmap = np.squeeze(sigmoid(PredictionFileParser(L, ',').parse('example3/sequence.fa.jackhmmer4.plmdca2')))
-#cmap = 1. - sigmoid(distances - 8.)
-
-gdfuzz = GaussFold()
-coords_predicted = gdfuzz.to_coords(cmap, ssp)
-
-print('Compute TM-score')
-print('tm: ', tm_score(coords_target, coords_predicted))

@@ -85,6 +85,13 @@ def projection_invariant(func):
     """
 
     def new_func(coords_predicted, coords_target):
+        
+        # Remove invalid indices
+        valid_indices = np.asarray(
+            [i for i, x in enumerate(coords_target) if x is not None])
+        coords_predicted = np.asarray(coords_predicted)[valid_indices]
+        coords_target = np.asarray([coords_target[i] for i in valid_indices])
+
         coords_predicted = coords_predicted - np.mean(coords_predicted, axis=0)
         coords_target = coords_target - np.mean(coords_target, axis=0)
 

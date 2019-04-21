@@ -36,45 +36,6 @@ class Parser:
             return self.__parse__(filepath)
 
 
-class PairsParser(Parser):
-
-    def getSupportedExtensions(self):
-        return []
-
-    def __parse_pairs__(self, filepath, delimiter=',', target_col=2, column_names=list(), sequence_length=None):
-        assert("target" in column_names)
-        with open(filepath, "r") as f:
-            lines = f.readlines()
-            try:
-                if sequence_length is None:
-                    dataframe = pd.read_csv(filepath, sep=delimiter, skip_blank_lines=True,
-                        header=None, names=column_names, index_col=False)
-                    sequence_length = np.asarray(dataframe[["i", "j"]]).max()
-            except ValueError:
-                return None
-            data = np.full((sequence_length, sequence_length), np.nan, dtype=np.double)
-            np.fill_diagonal(data, 0)
-            for line in lines:
-                elements = line.rstrip("\r\n").split(delimiter)
-                i, j, k = int(elements[0]) - 1, int(elements[1]) - 1, float(elements[target_col])
-                data[i, j] = data[j, i] = k
-            if np.isnan(data).any():
-                # sequence_length is wrong or the input file has missing pairs
-                warnings.warn("Warning: Pairs of residues are missing from the contacts text file")
-                warnings.warn("Number of missing pairs: %i " % np.isnan(data).sum())
-            return data
-
-
-class CBParser(PairsParser):
-
-    def getSupportedExtensions(self):
-        return [".contacts", ".CB"]
-
-    def __parse__(self, filepath):
-        return self.__parse_pairs__(filepath, delimiter=' ', target_col=2,
-            column_names = ["i", "j", "target"])
-
-
 class SS3Parser(Parser):
 
     def __init__(self, target_indices=[3, 4, 5]):
@@ -96,15 +57,15 @@ class SS3Parser(Parser):
         return np.asarray(data)
 
 
-class PredictionFileParser(Parser):
+class ContactParser(Parser):
 
-    def __init__(self, sequence_length, delimiter=' ', target_cols=None):
+    def __init__(self, sequence_length, delimiter=' ', target_cols=[2]):
         self.sequence_length = sequence_length
         self.delimiter = delimiter
         self.target_cols = target_cols
 
     def getSupportedExtensions(self):
-        return ['.out', '.gaussdca', '.psicov2', '.plmdca2']
+        return ['.con', '.out', '.gaussdca', '.psicov2', '.plmdca2']
 
     def is_comment(self, elements):
         is_comment = False
@@ -144,7 +105,7 @@ class PredictionFileParser(Parser):
                 # sequence_length is wrong or the input file has missing pairs
                 warnings.warn('Warning: Pairs of residues are missing from the contacts text file')
                 warnings.warn('Number of missing pairs: %i ' % np.isnan(data).sum())
-            return data
+            return np.squeeze(data)
 
 
 class FastaParser(Parser):
