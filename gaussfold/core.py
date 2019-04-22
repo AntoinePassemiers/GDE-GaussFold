@@ -17,21 +17,21 @@ class GaussFold:
     """GDE-GaussFold base class.
 
     Attributes:
+        sep (int): Minimum sequence separation, excluding
+            backbone contacts.
         n_runs (int): Number of times to run Multi-Dimensional
             Scaling algorithm from scratch.
         max_n_iter (int): Maximum number of iterations of
             Multi-Dimensional Scaling algorithm.
         eps (float): Convergence threshold of Multi-Dimensional
             Scaling algorithm.
-        rtop (float): the (rtop x L) top contacts are used
-            to compute graph distances.
     """
 
-    def __init__(self, n_runs=1, max_n_iter=300, eps=1e-3, rtop=4.5):
+    def __init__(self, sep=1, n_runs=1, max_n_iter=300, eps=1e-3):
+        self.sep = sep
         self.n_runs = n_runs
         self.max_n_iter = max_n_iter
         self.eps = eps
-        self.rtop = rtop
         self._model = None
         self._optimizer = None
 
@@ -55,12 +55,36 @@ class GaussFold:
 
         # Set diagonal to ones
         cmap = np.asarray(cmap)
+        cmap[np.isnan(cmap)] = 0.
         np.fill_diagonal(cmap, 1)
         # TODO: add more ones if not connected graph
 
-        gds = self.compute_gds(cmap, self.rtop)
-        if (np.count_nonzero(gds) / float(L ** 2.)) < 0.5:
-            gds = self.compute_gds(cmap, 4.5)
+        # Choose threshold such that exactly 4.5*L contacts
+        # are obtained
+        L = len(cmap)
+        proba = cmap[np.triu_indices(L, -6)]
+        np.sort(proba)
+        threshold = proba[-int(np.round(4.5 * L))]
+
+        # Compute confidence indexes
+        """
+        weights = cmap - threshold
+        weights[weights < 0.] = 0.
+        weights /= np.max(weights)
+        """
+        weights = np.ones((L, L), dtype=np.float)
+
+        # Create graph from adjacency matrix
+        A = (cmap > threshold)
+        G = nx.from_numpy_array(A, parallel_edges=False)
+
+        # Compute graph distance map
+        path_lengths = shortest_path_length(G)
+        gds = np.zeros((L, L), dtype=np.int)
+        for i, i_lengths in path_lengths:
+            for j in i_lengths.keys():
+                gds[i, j] = i_lengths[j]
+                gds[j, i] = gds[i, j]
 
         # Apply theoretical linear correspondence between graph
         # distance and Angstroms distance based on statistical
@@ -68,6 +92,14 @@ class GaussFold:
         # distance of 1.
         # The empirical value of 4.846 could be used as well.
         distances = gds * 5.72
+
+        import matplotlib.pyplot as plt
+        plt.imshow(gds)
+        plt.colorbar()
+        plt.show()
+        plt.imshow(weights)
+        plt.show()
+        #import sys; sys.exit(0)
 
         if verbose:
             print('Apply Multi-Dimensional Scaling algorithm')
@@ -98,7 +130,7 @@ class GaussFold:
 
         # Create Gaussian model if not set by the user
         if not isinstance(self._model, Model):
-            self._model = self.create_model(gds, ssp)
+            self._model = self.create_model(gds, ssp, weights)
 
         # Create optimizer if not set by the user.
         # Use default hyper-parameters.
@@ -111,29 +143,7 @@ class GaussFold:
                 X_transformed, obj, verbose=verbose)
         return best_coords
 
-    def compute_gds(self, cmap, rtop):
-        # Choose threshold such that exactly rtop*L contacts
-        # are obtained
-        L = len(cmap)
-        proba = cmap[np.triu_indices(L, -6)]
-        np.sort(proba)
-        threshold = proba[-int(np.round(rtop * L))]
-
-        # Create graph from adjacency matrix
-        cmap = np.nan_to_num(cmap)
-        A = (cmap > threshold)
-        G = nx.from_numpy_array(A, parallel_edges=False)
-
-        # Compute graph distance map
-        path_lengths = shortest_path_length(G)
-        gds = np.zeros((L, L), dtype=np.int)
-        for i, i_lengths in path_lengths:
-            for j in i_lengths.keys():
-                gds[i, j] = i_lengths[j]
-                gds[j, i] = gds[i, j]
-        return gds
-
-    def create_model(self, gds, ssp):
+    def create_model(self, gds, ssp, weights):
         """Creates a Gaussian model for the protein.
 
         Parameters:
@@ -142,6 +152,7 @@ class GaussFold:
             ssp (:obj:`np.ndarray`): Array of shape (L,) representing
                 3-state secondary structure prediction.
                 0 stands for 'H', 1 for 'E' and 2 for 'C'.
+            weights (:obj:`np.ndarray`): Matrix of restraint weights
 
         Returns:
             :obj:`gaussold.Model`: Gaussian model with
@@ -161,51 +172,52 @@ class GaussFold:
         # to be defined for each pair of residues before
         # optimizing this model.
         model = Model(L)
+
+        # Add backbone restraints:
+        # Restraints based on average
+        # C-alpha - C-alpha distance for residues
+        # with a sequence separation of 1.
+        for i in range(L - 1):
+            model.add_restraint(i, i + 1, 3.82, 0.39, weight=L)
         
         # Add restraints based on graph distances:
         # either contacts or non-contacts.
         for i in range(L):
-            for j in range(max(0, i-1)):
+            for j in range(max(0, i-self.sep)):
                 mu = gds[i, j] * 5.72
                 sigma = gds[i, j] * 1.34
-                model.add_restraint(i, j, mu, sigma)
-
-        # Add restraints based on average
-        # C-alpha - C-alpha distance for residues
-        # with a sequence separation of 1.
-        for i in range(L - 1):
-            model.add_restraint(i, i + 1, 3.82, 0.39)
+                model.add_restraint(i, j, mu, sigma, weight=weights[i, j])
 
         # Add restraints based on contacts in predicted
         # secondary structures
         for i in range(L):
-            for j in range(i):
+            for j in range(max(0, i-self.sep)):
                 if gds[i, j] == 1: # Contact
                     sep = np.abs(i - j)
                     if segment_ids[i] == segment_ids[j]:
                         if ssp[i] == 0: # Helix
                             if sep == 1:
-                                model.add_restraint(i, j, 3.82, 0.35)
+                                model.add_restraint(i, j, 3.82, 0.35, weight=weights[i, j])
                             elif sep == 2:
-                                model.add_restraint(i, j, 5.50, 0.52)
+                                model.add_restraint(i, j, 5.50, 0.52, weight=weights[i, j])
                             elif sep == 3:
-                                model.add_restraint(i, j, 5.33, 0.93)
+                                model.add_restraint(i, j, 5.33, 0.93, weight=weights[i, j])
                             elif sep == 4:
-                                model.add_restraint(i, j, 6.42, 1.04)
+                                model.add_restraint(i, j, 6.42, 1.04, weight=weights[i, j])
                         elif ssp[i] == 1: # Beta strand
                             if sep == 1:
-                                model.add_restraint(i, j, 3.80, 0.28)
+                                model.add_restraint(i, j, 3.80, 0.28, weight=weights[i, j])
                             elif sep == 2:
-                                model.add_restraint(i, j, 6.66, 0.30)
+                                model.add_restraint(i, j, 6.66, 0.30, weight=weights[i, j])
                     elif (ssp[i] == 0 and ssp[j] == 1) or (ssp[i] == 1 and ssp[j] == 0):
                         if sep >= 4: # Alpha/beta contact
-                            model.add_restraint(i, j, 6.05, 0.95)
+                            model.add_restraint(i, j, 6.05, 0.95, weight=weights[i, j])
                     elif (ssp[i] == 0 and ssp[j] == 2) or (ssp[i] == 2 and ssp[j] == 0):
                         if sep >= 4: # Helix/coil contact
-                            model.add_restraint(i, j, 6.60, 0.92)
+                            model.add_restraint(i, j, 6.60, 0.92, weight=weights[i, j])
                     elif (ssp[i] == 1 and ssp[j] == 2) or (ssp[i] == 2 and ssp[j] == 1):
                         if sep >= 4: # Beta/coil contact
-                            model.add_restraint(i, j, 6.44, 1.00)
+                            model.add_restraint(i, j, 6.44, 1.00, weight=weights[i, j])
         return model
 
     @property
