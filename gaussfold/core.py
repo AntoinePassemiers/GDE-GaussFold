@@ -31,11 +31,25 @@ class GaussFold:
         self.n_runs = n_runs
         self.max_n_iter = max_n_iter
         self.eps = eps
-        self.model = None
-        self.optimizer = None
+        self._model = None
+        self._optimizer = None
 
-    def run(self, cmap, ssp):
+    def run(self, cmap, ssp, verbose=True):
+        """Runs GDE-GaussFold algorithm.
 
+        Parameters:
+            cmap (:obj:`np.ndarray`): Array of shape (L, L) representing
+                predicted contact probabilities, where L is the number of
+                residues in the sequence.
+            ssp (:obj:`np.ndarray`): Array of shape (L,) representing
+                3-state secondary structure prediction.
+                0 stands for 'H', 1 for 'E' and 2 for 'C'.
+            verbose (bool): Whether to display messages in stdout.
+
+        Returns:
+            :obj:`np.ndarray`: Array of shape (L, 3) representing the
+                protein in the 3D space.
+        """
         L = len(cmap)
 
         # Set diagonal to ones
@@ -49,11 +63,10 @@ class GaussFold:
         np.sort(proba)
         threshold = proba[-int(np.round(4.5 * L))]
 
-        # Create grah from adjacency matrix
+        # Create graph from adjacency matrix
         cmap = np.nan_to_num(cmap)
         A = (cmap > threshold)
         G = nx.from_numpy_array(A, parallel_edges=False)
-        # TODO: cost of edges in fuzzy case?
 
         # Compute graph distance map
         path_lengths = shortest_path_length(G)
@@ -70,7 +83,8 @@ class GaussFold:
         # The empirical value of 4.846 could be used as well.
         distances = gds * 5.72
 
-        print('MDS')
+        if verbose:
+            print('Apply Multi-Dimensional Scaling algorithm')
 
         # Multi-dimensional scaling to obtain approximate
         # 3D coordinates
@@ -85,22 +99,45 @@ class GaussFold:
                 dissimilarity='precomputed')
         X_transformed = embedding.fit_transform(distances)
 
-        print('Apply deviation correction')
+        if verbose:
+            print('Apply deviation correction')
 
         # Apply correction on pairs of adjacent residues
         # based on known C_alpha-C_alpha (or C_beta-C_beta) distance
         corrector = DeviationCorrector(L)
         X_transformed = corrector.fit_transform(X_transformed)
 
-        if not isinstance(self.model, Model):
-            self.model = self.create_model(gds, ssp)
+        # Create Gaussian model if not set by the user
+        if not isinstance(self._model, Model):
+            self._model = self.create_model(gds, ssp)
 
-        if not isinstance(self.optimizer, Optimizer):
-            self.optimizer = Optimizer(X_transformed, self.model.evaluate)
-        best_coords = self.optimizer.run(n_iter=100000)
+        # Create optimizer if not set by the user.
+        # Use default hyper-parameters.
+        if not isinstance(self._optimizer, Optimizer):
+            self._optimizer = Optimizer()
+        
+        # Run optimizer on the Gaussian model
+        obj = self._model.evaluate # Objective function
+        best_coords = self._optimizer.run(
+                X_transformed, obj, verbose=verbose)
         return best_coords
 
     def create_model(self, gds, ssp):
+        """Creates a Gaussian model for the protein.
+
+        Parameters:
+            gds (:obj:`np.ndarray`): Matrix of graph distance
+                between each pair of residues in the protein.
+            ssp (:obj:`np.ndarray`): Array of shape (L,) representing
+                3-state secondary structure prediction.
+                0 stands for 'H', 1 for 'E' and 2 for 'C'.
+
+        Returns:
+            :obj:`gaussold.Model`: Gaussian model with
+                restraints defined for each pair of residues.
+        """
+        # Cut predicted secondary structure
+        # into contiguous segments
         L = len(ssp)
         segment_ids = [0]
         for i in range(1, L):
@@ -109,22 +146,32 @@ class GaussFold:
             else:
                 segment_ids.append(segment_ids[i-1])
 
+        # Instantiate an empty model. Restraints have
+        # to be defined for each pair of residues before
+        # optimizing this model.
         model = Model(L)
         
+        # Add restraints based on graph distances:
+        # either contacts or non-contacts.
         for i in range(L):
             for j in range(max(0, i-1)):
                 mu = gds[i, j] * 5.72
                 sigma = gds[i, j] * 1.34
                 model.add_restraint(i, j, mu, sigma)
 
+        # Add restraints based on average
+        # C-alpha - C-alpha distance for residues
+        # with a sequence separation of 1.
         for i in range(L - 1):
             model.add_restraint(i, i + 1, 3.82, 0.39)
 
+        # Add restraints based on contacts in predicted
+        # secondary structures
         for i in range(L):
             for j in range(i):
-                sep = np.abs(i - j)
-                if segment_ids[i] == segment_ids[j]:
-                    if gds[i, j] == 1: # Intra-segment contact
+                if gds[i, j] == 1: # Contact
+                    sep = np.abs(i - j)
+                    if segment_ids[i] == segment_ids[j]:
                         if ssp[i] == 0: # Helix
                             if sep == 1:
                                 model.add_restraint(i, j, 3.82, 0.35)
@@ -140,12 +187,28 @@ class GaussFold:
                             elif sep == 2:
                                 model.add_restraint(i, j, 6.66, 0.30)
                 elif (ssp[i] == 0 and ssp[j] == 1) or (ssp[i] == 1 and ssp[j] == 0):
-                    if gds[i, j] == 1 and sep >= 4: # Alpha/beta contact
+                    if sep >= 4: # Alpha/beta contact
                         model.add_restraint(i, j, 6.05, 0.95)
                 elif (ssp[i] == 0 and ssp[j] == 2) or (ssp[i] == 2 and ssp[j] == 0):
-                    if gds[i, j] == 1 and sep >= 4: # Helix/coil contact
+                    if sep >= 4: # Helix/coil contact
                         model.add_restraint(i, j, 6.60, 0.92)
                 elif (ssp[i] == 1 and ssp[j] == 2) or (ssp[i] == 2 and ssp[j] == 1):
-                    if gds[i, j] == 1 and sep >= 4: # Beta/coil contact
+                    if sep >= 4: # Beta/coil contact
                         model.add_restraint(i, j, 6.44, 1.00)
         return model
+
+    @property
+    def model(self):
+        return self._model
+    
+    @model.setter
+    def model(self, model):
+        self._model = model
+
+    @property
+    def optimizer(self):
+        return self._optimizer
+    
+    @optimizer.setter
+    def optimizer(self, optimizer):
+        self._optimizer = optimizer

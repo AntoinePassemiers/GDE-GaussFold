@@ -1,4 +1,4 @@
-# Graph Distance Evolutionary Gaussian Folding
+# Graph-Distance Evolutionary Gaussian Folding
 
 
 GDE-GaussFold uses Gaussian restraints to model distances between pairs
