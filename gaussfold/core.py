@@ -58,24 +58,9 @@ class GaussFold:
         np.fill_diagonal(cmap, 1)
         # TODO: add more ones if not connected graph
 
-        # Choose threshold such that exactly rtop*L contacts
-        # are obtained
-        proba = cmap[np.triu_indices(L, -6)]
-        np.sort(proba)
-        threshold = proba[-int(np.round(self.rtop * L))]
-
-        # Create graph from adjacency matrix
-        cmap = np.nan_to_num(cmap)
-        A = (cmap > threshold)
-        G = nx.from_numpy_array(A, parallel_edges=False)
-
-        # Compute graph distance map
-        path_lengths = shortest_path_length(G)
-        gds = np.zeros((L, L), dtype=np.int)
-        for i, i_lengths in path_lengths:
-            for j in i_lengths.keys():
-                gds[i, j] = i_lengths[j]
-                gds[j, i] = gds[i, j]
+        gds = self.compute_gds(cmap, self.rtop)
+        if (np.count_nonzero(gds) / float(L ** 2.)) < 0.5:
+            gds = self.compute_gds(cmap, 4.5)
 
         # Apply theoretical linear correspondence between graph
         # distance and Angstroms distance based on statistical
@@ -122,6 +107,28 @@ class GaussFold:
         best_coords = self._optimizer.run(
                 X_transformed, obj, verbose=verbose)
         return best_coords
+
+    def compute_gds(self, cmap, rtop):
+        # Choose threshold such that exactly rtop*L contacts
+        # are obtained
+        L = len(cmap)
+        proba = cmap[np.triu_indices(L, -6)]
+        np.sort(proba)
+        threshold = proba[-int(np.round(rtop * L))]
+
+        # Create graph from adjacency matrix
+        cmap = np.nan_to_num(cmap)
+        A = (cmap > threshold)
+        G = nx.from_numpy_array(A, parallel_edges=False)
+
+        # Compute graph distance map
+        path_lengths = shortest_path_length(G)
+        gds = np.zeros((L, L), dtype=np.int)
+        for i, i_lengths in path_lengths:
+            for j in i_lengths.keys():
+                gds[i, j] = i_lengths[j]
+                gds[j, i] = gds[i, j]
+        return gds
 
     def create_model(self, gds, ssp):
         """Creates a Gaussian model for the protein.

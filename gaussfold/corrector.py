@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# corrector.py: CA-CA and CB-CB distance deviation correction
+# corrector.py: CA-CA distance deviation correction
 # author : Antoine Passemiers
 
 import numpy as np
