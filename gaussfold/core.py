@@ -23,14 +23,15 @@ class GaussFold:
             Multi-Dimensional Scaling algorithm.
         eps (float): Convergence threshold of Multi-Dimensional
             Scaling algorithm.
+        rtop (float): the (rtop x L) top contacts are used
+            to compute graph distances.
     """
 
-    def __init__(self, n_runs=1, max_n_iter=300, eps=1e-3):
-        """
-        """
+    def __init__(self, n_runs=1, max_n_iter=300, eps=1e-3, rtop=4.5):
         self.n_runs = n_runs
         self.max_n_iter = max_n_iter
         self.eps = eps
+        self.rtop = rtop
         self._model = None
         self._optimizer = None
 
@@ -57,11 +58,11 @@ class GaussFold:
         np.fill_diagonal(cmap, 1)
         # TODO: add more ones if not connected graph
 
-        # Choose threshold such that exactly 4.5*L contacts
+        # Choose threshold such that exactly rtop*L contacts
         # are obtained
         proba = cmap[np.triu_indices(L, -6)]
         np.sort(proba)
-        threshold = proba[-int(np.round(4.5 * L))]
+        threshold = proba[-int(np.round(self.rtop * L))]
 
         # Create graph from adjacency matrix
         cmap = np.nan_to_num(cmap)

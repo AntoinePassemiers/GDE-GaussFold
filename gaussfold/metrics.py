@@ -70,62 +70,74 @@ def transform(coords, a, b, c, phi, psi, theta, swapx, swapy, swapz):
     return coords_projected
 
 
-def projection_invariant(func):
+def projection_invariant(method='Maximize'):
     """Decorator for making evaluation metrics
     symmetry, rotation and translation-invariant in 3D space.
 
     Parameters:
-        func (callable): Function taking as first argument an
-            array of shape (n_points, 3) representing predicted
-            points and as second argument an array of shape
-            (n_points, 3) representing ground-truth points.
+        maximize (bool, optional): Whether to maximize the
+            evaluation metric.
 
     Returns:
         callable: The same function but transformation-invariant.
     """
 
-    def new_func(coords_predicted, coords_target):
-        
-        # Remove invalid indices
-        valid_indices = np.asarray(
-            [i for i, x in enumerate(coords_target) if x is not None])
-        coords_predicted = np.asarray(coords_predicted)[valid_indices]
-        coords_target = np.asarray([coords_target[i] for i in valid_indices])
+    assert(method in ['Maximize', 'Minimize'])
+    maximize = (method == 'Maximize')
 
-        coords_predicted = coords_predicted - np.mean(coords_predicted, axis=0)
-        coords_target = coords_target - np.mean(coords_target, axis=0)
+    def decorator(func):
+        """
+        Parameters:
+            func (callable): Function taking as first argument an
+                array of shape (n_points, 3) representing predicted
+                points and as second argument an array of shape
+                (n_points, 3) representing ground-truth points.
+        """
 
-        def objective(x):
-            coords_projected = transform(coords_predicted, *x)
-            score = func(coords_projected, coords_target)
-            return -score
+        def new_func(coords_predicted, coords_target):
+            
+            # Remove invalid indices
+            valid_indices = np.asarray(
+                [i for i, x in enumerate(coords_target) if x is not None])
+            coords_predicted = np.asarray(coords_predicted)[valid_indices]
+            coords_target = np.asarray([coords_target[i] for i in valid_indices])
 
-        scores = list()
-        for swapx in [0, 1]:
-            for swapy in [0, 1]:
-                for swapz in [0, 1]:
-                    
-                    # Start at the origin
-                    a = b = c = 0
-                    
-                    # Start with random angles
-                    phi = np.random.uniform(-2.*np.pi, 2.*np.pi)
-                    psi = np.random.uniform(-2.*np.pi, 2.*np.pi)
-                    theta = np.random.uniform(-2.*np.pi, 2.*np.pi)
-                    
-                    # Optimize
-                    res = minimize(
-                            objective,
-                            [a, b, c, phi, psi, theta, swapx, swapy, swapz],
-                            bounds=OPTIMIZATION_BOUNDS)
-                    score = -objective(res.x)
-                    scores.append(score)
-        return np.max(scores)
-    new_func.__name__ = func.__name__
-    return new_func
+            coords_predicted = coords_predicted - np.mean(coords_predicted, axis=0)
+            coords_target = coords_target - np.mean(coords_target, axis=0)
+
+            def objective(x):
+                coords_projected = transform(coords_predicted, *x)
+                score = func(coords_projected, coords_target)
+                return score if not maximize else -score
+
+            scores = list()
+            for swapx in [0, 1]:
+                for swapy in [0, 1]:
+                    for swapz in [0, 1]:
+                        
+                        # Start at the origin
+                        a = b = c = 0
+                        
+                        # Start with random angles
+                        phi = np.random.uniform(-2.*np.pi, 2.*np.pi)
+                        psi = np.random.uniform(-2.*np.pi, 2.*np.pi)
+                        theta = np.random.uniform(-2.*np.pi, 2.*np.pi)
+                        
+                        # Optimize
+                        res = minimize(
+                                objective,
+                                [a, b, c, phi, psi, theta, swapx, swapy, swapz],
+                                bounds=OPTIMIZATION_BOUNDS)
+                        score = objective(res.x)
+                        scores.append(score)
+            scores = np.asarray(scores)
+            return np.max(-scores) if maximize else np.min(scores)
+        new_func.__name__ = func.__name__
+        return new_func
+    return decorator
 
 
-@projection_invariant
+@projection_invariant('Maximize')
 def tm_score(coords_predicted, coords_target):
     """Computes template-modelling score.
 
@@ -144,7 +156,7 @@ def tm_score(coords_predicted, coords_target):
     return (1. / (1. + (distances / d_0) ** 2.)).sum() / float(L)
 
 
-@projection_invariant
+@projection_invariant('Minimize')
 def rmsd(coords_predicted, coords_target):
     """Computes root-mean-square deviation.
 
