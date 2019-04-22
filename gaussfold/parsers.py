@@ -5,44 +5,19 @@
 import os
 import warnings
 import numpy as np
-import pandas as pd
-
-import minineedle # https://github.com/scastlara/minineedle
-import miniseq # https://github.com/scastlara/miniseq
-
-try:
-    # Subclassing is not required
-    # -> We can use pickle's C implementation
-    import cPickle as pickle
-except:
-    import pickle
-
-
-class UnsupportedExtensionError(Exception):
-    pass
 
 
 class Parser:
 
-    def getSupportedExtensions(self):
-        return list()
-
     def parse(self, filepath):
         _, file_ext = os.path.splitext(filepath)
-        if not file_ext in self.getSupportedExtensions():
-            raise UnsupportedExtensionError(
-                "Extension %s is not supported by parser %s" % (file_ext, self.__class__.__name__))
-        else:
-            return self.__parse__(filepath)
+        return self.__parse__(filepath)
 
 
 class SS3Parser(Parser):
 
     def __init__(self, target_indices=[3, 4, 5]):
         self.target_indices = target_indices
-
-    def getSupportedExtensions(self):
-        return ['.ss3', '.acc', '.diso', '.txt']
 
     def __parse__(self, filepath):
         data = list()
@@ -63,9 +38,6 @@ class ContactParser(Parser):
         self.sequence_length = sequence_length
         self.delimiter = delimiter
         self.target_cols = target_cols
-
-    def getSupportedExtensions(self):
-        return ['.con', '.out', '.gaussdca', '.psicov2', '.plmdca2']
 
     def is_comment(self, elements):
         is_comment = False
@@ -109,9 +81,6 @@ class ContactParser(Parser):
 
 
 class FastaParser(Parser):
-
-    def getSupportedExtensions(self):
-        return ['.fasta', '.fa', '.a3m', '.trimmed']
 
     def __parse__(self, filepath):
         with open(filepath, 'r') as f:
@@ -211,9 +180,6 @@ class PDBParser(Parser):
         self.prot_name = prot_name
         self.method = method
 
-    def getSupportedExtensions(self):
-        return ['.pdb']
-
     def isAppropriateAtom(self, res_name, atom):
         valid = False
         if self.method == 'CA' and atom == 'CA':
@@ -228,6 +194,8 @@ class PDBParser(Parser):
         return valid
 
     def align_query_sequence(self, query_seq, whole_seq):
+        import minineedle # https://github.com/scastlara/minineedle
+        import miniseq # https://github.com/scastlara/miniseq
         if len(query_seq) != len(whole_seq):
             query_seq = miniseq.Protein('', query_seq)
             whole_seq = miniseq.Protein('', whole_seq)
