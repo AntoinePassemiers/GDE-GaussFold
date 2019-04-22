@@ -91,7 +91,10 @@ class GaussFold:
         # Apply correction on pairs of adjacent residues
         # based on known C_alpha-C_alpha (or C_beta-C_beta) distance
         corrector = DeviationCorrector(L)
-        X_transformed = corrector.fit_transform(X_transformed)
+        try:
+            X_transformed = corrector.fit_transform(X_transformed)
+        except np.linalg.linalg.LinAlgError:
+            pass # TODO
 
         # Create Gaussian model if not set by the user
         if not isinstance(self._model, Model):
@@ -194,15 +197,15 @@ class GaussFold:
                                 model.add_restraint(i, j, 3.80, 0.28)
                             elif sep == 2:
                                 model.add_restraint(i, j, 6.66, 0.30)
-                elif (ssp[i] == 0 and ssp[j] == 1) or (ssp[i] == 1 and ssp[j] == 0):
-                    if sep >= 4: # Alpha/beta contact
-                        model.add_restraint(i, j, 6.05, 0.95)
-                elif (ssp[i] == 0 and ssp[j] == 2) or (ssp[i] == 2 and ssp[j] == 0):
-                    if sep >= 4: # Helix/coil contact
-                        model.add_restraint(i, j, 6.60, 0.92)
-                elif (ssp[i] == 1 and ssp[j] == 2) or (ssp[i] == 2 and ssp[j] == 1):
-                    if sep >= 4: # Beta/coil contact
-                        model.add_restraint(i, j, 6.44, 1.00)
+                    elif (ssp[i] == 0 and ssp[j] == 1) or (ssp[i] == 1 and ssp[j] == 0):
+                        if sep >= 4: # Alpha/beta contact
+                            model.add_restraint(i, j, 6.05, 0.95)
+                    elif (ssp[i] == 0 and ssp[j] == 2) or (ssp[i] == 2 and ssp[j] == 0):
+                        if sep >= 4: # Helix/coil contact
+                            model.add_restraint(i, j, 6.60, 0.92)
+                    elif (ssp[i] == 1 and ssp[j] == 2) or (ssp[i] == 2 and ssp[j] == 1):
+                        if sep >= 4: # Beta/coil contact
+                            model.add_restraint(i, j, 6.44, 1.00)
         return model
 
     @property

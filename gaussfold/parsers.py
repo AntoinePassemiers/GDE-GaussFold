@@ -34,10 +34,12 @@ class SS3Parser(Parser):
 
 class ContactParser(Parser):
 
-    def __init__(self, sequence_length, delimiter=' ', target_cols=[2]):
+    def __init__(self, sequence_length, delimiter=' ', target_cols=[2],
+                 verbose=True):
         self.sequence_length = sequence_length
         self.delimiter = delimiter
         self.target_cols = target_cols
+        self.verbose = verbose
 
     def is_comment(self, elements):
         is_comment = False
@@ -73,7 +75,7 @@ class ContactParser(Parser):
                 if not self.is_comment(elements):
                     i, j = int(elements[0]) - 1, int(elements[1]) - 1
                     data[:, i, j] = data[:, j, i] = self.get_features(elements)
-            if np.isnan(data).any():
+            if self.verbose and np.isnan(data).any():
                 # sequence_length is wrong or the input file has missing pairs
                 warnings.warn('Warning: Pairs of residues are missing from the contacts text file')
                 warnings.warn('Number of missing pairs: %i ' % np.isnan(data).sum())
