@@ -3,14 +3,13 @@
 # author : Antoine Passemiers
 
 from gaussfold.corrector import DeviationCorrector
+from gaussfold.graph import Graph
 from gaussfold.model import Model
 from gaussfold.optimizer import Optimizer
 
 import numpy as np
 import random
 from sklearn.manifold import MDS
-import networkx as nx
-from networkx.algorithms.shortest_paths.generic import shortest_path_length
 
 
 class GaussFold:
@@ -56,15 +55,34 @@ class GaussFold:
         # Set diagonal to ones
         cmap = np.asarray(cmap)
         cmap[np.isnan(cmap)] = 0.
-        np.fill_diagonal(cmap, 1)
-        # TODO: add more ones if not connected graph
+        np.fill_diagonal(cmap, 0)
 
         # Choose threshold such that exactly 4.5*L contacts
         # are obtained
         L = len(cmap)
-        proba = cmap[np.triu_indices(L, -6)]
-        np.sort(proba)
-        threshold = proba[-int(np.round(4.5 * L))]
+        proba = cmap[np.triu_indices(L, -self.sep)]
+        proba.sort()
+
+        n_top = int(np.round(4.5 * L))
+        threshold = proba[-n_top]
+        A = (cmap > threshold)
+        G = Graph(A)
+        if not G.is_connected():
+            gds = G.distances()
+            missing = (gds == 0).all(axis=0)
+            missing_idx = np.where(missing)[0]
+            nonmissing_idx = np.where(~missing)[0]
+            A[missing_idx, np.random.choice(nonmissing_idx, size=len(missing_idx))] = 1
+
+
+        G = Graph(A)
+
+        import matplotlib.pyplot as plt
+        plt.imshow(G.distances())
+        plt.colorbar()
+        plt.show()
+
+        #import sys; sys.exit(0)
 
         # Compute confidence indexes
         """
@@ -73,18 +91,8 @@ class GaussFold:
         weights /= np.max(weights)
         """
         weights = np.ones((L, L), dtype=np.float)
-
-        # Create graph from adjacency matrix
-        A = (cmap > threshold)
-        G = nx.from_numpy_array(A, parallel_edges=False)
-
-        # Compute graph distance map
-        path_lengths = shortest_path_length(G)
-        gds = np.zeros((L, L), dtype=np.int)
-        for i, i_lengths in path_lengths:
-            for j in i_lengths.keys():
-                gds[i, j] = i_lengths[j]
-                gds[j, i] = gds[i, j]
+        weights[missing_idx, :] = 0.
+        weights[:, missing_idx] = 0.
 
         # Apply theoretical linear correspondence between graph
         # distance and Angstroms distance based on statistical
@@ -92,14 +100,6 @@ class GaussFold:
         # distance of 1.
         # The empirical value of 4.846 could be used as well.
         distances = gds * 5.72
-
-        import matplotlib.pyplot as plt
-        plt.imshow(gds)
-        plt.colorbar()
-        plt.show()
-        plt.imshow(weights)
-        plt.show()
-        #import sys; sys.exit(0)
 
         if verbose:
             print('Apply Multi-Dimensional Scaling algorithm')
@@ -117,24 +117,28 @@ class GaussFold:
                 dissimilarity='precomputed')
         X_transformed = embedding.fit_transform(distances)
 
-        if verbose:
-            print('Apply deviation correction')
-
         # Apply correction on pairs of adjacent residues
         # based on known C_alpha-C_alpha (or C_beta-C_beta) distance
-        corrector = DeviationCorrector(L)
+        if verbose:
+            print('Apply deviation correction')
+        corrector = DeviationCorrector(len(distances))
         try:
             X_transformed = corrector.fit_transform(X_transformed)
         except np.linalg.linalg.LinAlgError:
-            pass # TODO
+            if verbose:
+            print('[Warning] Invalid value encountered in deviation corrector')
 
         # Create Gaussian model if not set by the user
         if not isinstance(self._model, Model):
+            if verbose:
+                print('Model not set by user. Creating model from scratch...')
             self._model = self.create_model(gds, ssp, weights)
 
         # Create optimizer if not set by the user.
         # Use default hyper-parameters.
         if not isinstance(self._optimizer, Optimizer):
+            if verbose:
+                print('Optimizer not set by user. Using default parameters.')
             self._optimizer = Optimizer()
         
         # Run optimizer on the Gaussian model
@@ -178,15 +182,16 @@ class GaussFold:
         # C-alpha - C-alpha distance for residues
         # with a sequence separation of 1.
         for i in range(L - 1):
-            model.add_restraint(i, i + 1, 3.82, 0.39, weight=L)
+            model.add_restraint(i, i + 1, 3.82, 0.39, weight=10.)
         
         # Add restraints based on graph distances:
         # either contacts or non-contacts.
         for i in range(L):
             for j in range(max(0, i-self.sep)):
-                mu = gds[i, j] * 5.72
-                sigma = gds[i, j] * 1.34
-                model.add_restraint(i, j, mu, sigma, weight=weights[i, j])
+                if gds[i, j] > 0:
+                    mu = gds[i, j] * 5.72
+                    sigma = gds[i, j] * 1.34
+                    model.add_restraint(i, j, mu, sigma, weight=weights[i, j])
 
         # Add restraints based on contacts in predicted
         # secondary structures

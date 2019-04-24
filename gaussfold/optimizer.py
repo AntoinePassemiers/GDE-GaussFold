@@ -101,17 +101,14 @@ class Optimizer:
                 (array of shape (L, 3)).
         """
         # Shuffle the population
-        pop = [_ for _ in pop]
-        np.copy(scores)
         indices = np.arange(len(pop))
         random.shuffle(indices)
-        pop = [pop[i] for i in indices]
         scores = scores[indices]
 
         # Elect a winner in each of the two partitions
         ps = self.partition_size
-        left_winner = pop[np.argmax(scores[:ps])]
-        right_winner = pop[ps + np.argmax(scores[ps:])]
+        left_winner = pop[indices[np.argmax(scores[:ps])]]
+        right_winner = pop[indices[ps + np.argmax(scores[ps:2*ps])]]
 
         # Apply the cross-over and mutation operators
         individual = self.cross_over(left_winner, right_winner)
@@ -132,6 +129,7 @@ class Optimizer:
         """
         # Randomly initializes population and add initial
         # solution to it
+        initial_coords = np.nan_to_num(initial_coords)
         pop = [self.random_sol(initial_coords) \
                 for i in range(self.pop_size-1)]
         pop.append(initial_coords)
@@ -149,8 +147,9 @@ class Optimizer:
             # Create new solution to replace worst solution
             new_ind = self.new_sol(pop, scores)
             worst = np.argmin(scores)
-            pop[worst] = new_ind
+            pop[worst][:] = new_ind
             scores[worst] = obj(new_ind)
+            assert(not np.isnan(scores[worst]))
 
             # Check if improvement
             if scores[worst] > best_score:
@@ -160,6 +159,11 @@ class Optimizer:
                 print('Log-likelihood at iteration %i: %f' \
                     % (k + 1, best_score))
             self.scores.append(best_score)
+
+            if np.isnan(best_score):
+                if verbose:
+                    print('[Warning] Invalid value encountered in heuristic solver')
+                break
 
             # Stop algorithm if no more improvement
             if k - best_iteration >= self.early_stopping:

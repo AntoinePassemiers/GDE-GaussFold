@@ -50,7 +50,7 @@ if __name__ == '__main__':
         mutation_rate=0.5,   # Percentage of child's points to be mutated
         mutation_std=0.3,    # Stdv of mutation noise
         init_std=10.,        # Stdv for randomly generating initial solutions
-        early_stopping=2000) # Maximum number of iterations without improvement
+        early_stopping=5000) # Maximum number of iterations without improvement
 
     # Run GDE-GaussFold
     coords_predicted = gf.run(cmap, ssp, verbose=True)
