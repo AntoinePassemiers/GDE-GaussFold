@@ -37,7 +37,7 @@ class Optimizer:
         self.early_stopping = early_stopping
         self.scores = list()
 
-    def random_sol(self, initial_coords):
+    def random_sol(self, initial_solutions):
         """Generates a random solution by adding Gaussian noise
         to an initial solution.
 
@@ -49,6 +49,7 @@ class Optimizer:
         Returns:
             :obj:`np.ndarray`: A new solution of the same shape.
         """
+        initial_coords = random.choice(initial_solutions)
         L = initial_coords.shape[0]
         offsets = np.random.normal(0., self.init_std, size=(L, 3))
         individual = initial_coords + offsets
@@ -114,25 +115,22 @@ class Optimizer:
         individual = self.cross_over(left_winner, right_winner)
         return self.mutate(individual)
 
-    def run(self, initial_coords, obj, verbose=True):
+    def run(self, initial_solutions, obj, verbose=True):
         """Run heuristic optimizer on an initial solution,
         with given objective function.
 
         Parameters:
-            initial_coords (:obj:`np.ndarray`): Array of shape (L, 3)
-                representing the initial solution to the problem.
             obj (callable): Objective function to be maximized
             verbose (bool): Whether to display messages in stdout.
 
         Returns:
             :obj:`np.ndarray`: Optimal solution.
         """
-        # Randomly initializes population and add initial
+        # Randomly initializes population and adds initial
         # solution to it
-        initial_coords = np.nan_to_num(initial_coords)
-        pop = [self.random_sol(initial_coords) \
-                for i in range(self.pop_size-1)]
-        pop.append(initial_coords)
+        pop = [self.random_sol(initial_solutions) \
+                for i in range(self.pop_size-len(initial_solutions))]
+        pop += initial_solutions
 
         # Set initial solution as the best one so far
         self.scores = list()

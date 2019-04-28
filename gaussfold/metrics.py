@@ -94,7 +94,7 @@ def projection_invariant(method='Maximize'):
                 (n_points, 3) representing ground-truth points.
         """
 
-        def new_func(coords_predicted, coords_target):
+        def new_func(coords_predicted, coords_target, return_coords=False):
             
             # Remove invalid indices
             valid_indices = np.asarray(
@@ -111,6 +111,7 @@ def projection_invariant(method='Maximize'):
                 return score if not maximize else -score
 
             scores = list()
+            sols = list()
             for swapx in [0, 1]:
                 for swapy in [0, 1]:
                     for swapz in [0, 1]:
@@ -128,10 +129,18 @@ def projection_invariant(method='Maximize'):
                                 objective,
                                 [a, b, c, phi, psi, theta, swapx, swapy, swapz],
                                 bounds=OPTIMIZATION_BOUNDS)
+                        sols.append(res.x)
                         score = objective(res.x)
                         scores.append(score)
             scores = np.asarray(scores)
-            return np.max(-scores) if maximize else np.min(scores)
+            best_score = np.max(-scores) if maximize else np.min(scores)
+            if return_coords:
+                best_idx = np.argmax(-scores) if maximize else np.argmin(scores)
+                x = sols[best_idx]
+                coords_projected = transform(coords_predicted, *x)
+                return best_score, coords_projected
+            else:
+                return best_score
         new_func.__name__ = func.__name__
         return new_func
     return decorator

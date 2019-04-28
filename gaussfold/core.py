@@ -4,6 +4,7 @@
 
 from gaussfold.corrector import DeviationCorrector
 from gaussfold.graph import Graph
+from gaussfold.metrics import tm_score
 from gaussfold.model import Model
 from gaussfold.optimizer import Optimizer
 
@@ -26,8 +27,9 @@ class GaussFold:
             Scaling algorithm.
     """
 
-    def __init__(self, sep=1, n_runs=1, max_n_iter=300, eps=1e-3):
+    def __init__(self, sep=1, n_init_sols=20, n_runs=1, max_n_iter=300, eps=1e-3):
         self.sep = sep
+        self.n_init_sols = n_init_sols
         self.n_runs = n_runs
         self.max_n_iter = max_n_iter
         self.eps = eps
@@ -67,32 +69,34 @@ class GaussFold:
         threshold = proba[-n_top]
         A = (cmap > threshold)
         G = Graph(A)
+        gds = G.distances()
+        missing = np.zeros(L, dtype=np.bool)
         if not G.is_connected():
-            gds = G.distances()
             missing = (gds == 0).all(axis=0)
             missing_idx = np.where(missing)[0]
-            nonmissing_idx = np.where(~missing)[0]
-            A[missing_idx, np.random.choice(nonmissing_idx, size=len(missing_idx))] = 1
+            connected_idx = np.random.choice(
+                    np.arange(L), size=len(missing_idx), replace=False)
+            A[missing_idx, connected_idx] = 1
+            A[connected_idx, missing_idx] = 1
+            G = Graph(A)
 
-
-        G = Graph(A)
-
-        import matplotlib.pyplot as plt
-        plt.imshow(G.distances())
-        plt.colorbar()
-        plt.show()
-
-        #import sys; sys.exit(0)
+            """
+            gds[missing_idx, :] = G.distances()[missing_idx, :]
+            gds[:, missing_idx] = gds[missing_idx, :].T
+            missing_norm = gds[missing, :].mean()
+            nonmissing_norm = gds[~missing, :].mean()
+            gds = gds.astype(np.float)
+            gds[missing_idx, :] *= (nonmissing_norm / missing_norm)
+            gds[:, missing_idx] = gds[missing_idx, :].T
+            """
 
         # Compute confidence indexes
-        """
-        weights = cmap - threshold
-        weights[weights < 0.] = 0.
-        weights /= np.max(weights)
-        """
+        #weights = cmap - threshold
+        #weights[weights < 0.] = 0.
+        #weights /= np.max(weights)
         weights = np.ones((L, L), dtype=np.float)
-        weights[missing_idx, :] = 0.
-        weights[:, missing_idx] = 0.
+        weights[missing, :] = 0.
+        weights[:, missing] = 0.
 
         # Apply theoretical linear correspondence between graph
         # distance and Angstroms distance based on statistical
@@ -104,29 +108,38 @@ class GaussFold:
         if verbose:
             print('Apply Multi-Dimensional Scaling algorithm')
 
-        # Multi-dimensional scaling to obtain approximate
-        # 3D coordinates
-        embedding = MDS(
-                n_components=3,
-                metric=True,
-                n_init=self.n_runs,
-                max_iter=self.max_n_iter,
-                eps=self.eps,
-                n_jobs=None,
-                random_state=None,
-                dissimilarity='precomputed')
-        X_transformed = embedding.fit_transform(distances)
+        init_solutions = list()
+        for k in range(self.n_init_sols):
+            # Multi-dimensional scaling to obtain approximate
+            # 3D coordinates
+            embedding = MDS(
+                    n_components=3,
+                    metric=True,
+                    n_init=self.n_runs,
+                    max_iter=self.max_n_iter,
+                    eps=self.eps,
+                    n_jobs=None,
+                    random_state=None,
+                    dissimilarity='precomputed')
+            X_transformed = embedding.fit_transform(distances)
 
-        # Apply correction on pairs of adjacent residues
-        # based on known C_alpha-C_alpha (or C_beta-C_beta) distance
-        if verbose:
-            print('Apply deviation correction')
-        corrector = DeviationCorrector(len(distances))
-        try:
-            X_transformed = corrector.fit_transform(X_transformed)
-        except np.linalg.linalg.LinAlgError:
+            # Apply correction on pairs of adjacent residues
+            # based on known C_alpha-C_alpha (or C_beta-C_beta) distance
             if verbose:
-            print('[Warning] Invalid value encountered in deviation corrector')
+                print('Apply deviation correction')
+            corrector = DeviationCorrector(len(distances))
+            try:
+                X_transformed = corrector.fit_transform(X_transformed)
+            except np.linalg.linalg.LinAlgError:
+                if verbose:
+                    print('[Warning] Invalid value encountered in deviation corrector')
+            init_solutions.append(X_transformed)
+
+        # Align all initial solution in 3D space
+        if len(init_solutions) > 1:
+            for i in range(1, len(init_solutions)):
+                init_solutions[i] = tm_score(
+                    init_solutions[i], init_solutions[0], return_coords=True)[1]
 
         # Create Gaussian model if not set by the user
         if not isinstance(self._model, Model):
@@ -144,7 +157,7 @@ class GaussFold:
         # Run optimizer on the Gaussian model
         obj = self._model.evaluate # Objective function
         best_coords = self._optimizer.run(
-                X_transformed, obj, verbose=verbose)
+                init_solutions, obj, verbose=verbose)
         return best_coords
 
     def create_model(self, gds, ssp, weights):
@@ -182,7 +195,7 @@ class GaussFold:
         # C-alpha - C-alpha distance for residues
         # with a sequence separation of 1.
         for i in range(L - 1):
-            model.add_restraint(i, i + 1, 3.82, 0.39, weight=10.)
+            model.add_restraint(i, i + 1, 3.82, 0.39, weight=1.)
         
         # Add restraints based on graph distances:
         # either contacts or non-contacts.
