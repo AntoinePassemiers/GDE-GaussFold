@@ -1,8 +1,10 @@
 # Graph-Distance Evolutionary (GDE) Gaussian Folding
 
-
-GDE-GaussFold uses Gaussian restraints to model distances between pairs
-of residues and creates the three-dimensional representation that
+GDE-GaussFold is a template-free protein modelling software
+that assign 3D coordinates to residues
+based on predicted contact maps and secondary structure.
+It uses Gaussian restraints to model distances between pairs
+of residues and searches for the model that
 maximizes log-likelihood. Optimization is done heuristically with
 a non-stationary genetic algorithm.
 
