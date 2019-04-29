@@ -10,7 +10,7 @@ a non-stationary genetic algorithm.
 from gaussfold import GaussFold
 
 # cmap is an array of shape (L, L) of
-# predicted probabilities.
+# predicted contact probabilities.
 cmap = ...
 
 # ssp is an array of shape (L,) representing
