@@ -26,7 +26,8 @@ class Model:
         self.mu = np.full((self.L, self.L), np.nan, dtype=np.float)
         self.sigma = np.full((self.L, self.L), np.nan, dtype=np.float)
         self.weights = np.ones((self.L, self.L), dtype=np.float)
-        self.triu_indices = np.triu_indices(self.L, -1)
+        self.triu_indices = np.triu_indices(self.L, k=-1)
+        self.tril_indices = np.tril_indices(self.L, k=0)
         self.weighted = False
 
     def add_restraint(self, i, j, mu, sigma, weight=1.):
@@ -56,7 +57,8 @@ class Model:
             float: Log-likelihood of the coordinates given the Gaussian parameters.
         """
         distances = scipy.spatial.distance.cdist(coords, coords, metric='euclidean')
-        distances, mu, sigma = distances[self.triu_indices], self.mu[self.triu_indices], self.sigma[self.triu_indices]
+        distances = distances[self.triu_indices]
+        mu, sigma = self.mu[self.triu_indices], self.sigma[self.triu_indices]
 
         indices = ~np.isnan(mu)
         distances, mu, sigma = distances[indices], mu[indices], sigma[indices]
@@ -66,3 +68,36 @@ class Model:
             weights = self.weights[self.triu_indices]
             logp *= weights[indices]
         return -0.5 * logp.sum()
+
+    def gradient(self, coords):
+        """Computes gradient of log-likelihood given the Gaussian parameters `mu` and `sigma`,
+        with respect to 3D coordinates.
+
+        Parameters:
+            coords (np.ndarray): Array of shape (L, 3) where ith sub-array represents
+                the coordinates of residue i in three-dimensional space.
+
+        Returns:
+            np.ndarray: Array of shape (L, 3) representing the log-likelihood gradient
+                with respect to 3D coordinates.
+        """
+        L = coords.shape[0]
+        D = scipy.spatial.distance.cdist(coords, coords, metric='euclidean')
+        M, S = self.mu, self.sigma
+
+
+        X = np.tile(coords, (L, 1, 1))
+        delta = X - np.transpose(X, (1, 0, 2))
+
+        F = ((D - M) / (D * S ** 2.))[..., np.newaxis]
+        F[np.isnan(F)] = 0
+        grad = 4. * delta * F
+        grad[self.tril_indices] = 0
+        grad[np.isnan(self.mu)] = 0
+
+        if self.weighted:
+            grad *= weights[..., np.newaxis]
+        grad = np.nan_to_num(grad)
+
+        grad = grad.sum(axis=0)
+        return grad

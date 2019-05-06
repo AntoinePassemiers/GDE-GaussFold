@@ -54,7 +54,7 @@ class GaussFold:
         """
         L = len(cmap)
 
-        # Set diagonal to ones
+        # Set diagonal to zeros
         cmap = np.asarray(cmap)
         cmap[np.isnan(cmap)] = 0.
         np.fill_diagonal(cmap, 0)
@@ -64,9 +64,9 @@ class GaussFold:
         L = len(cmap)
         proba = cmap[np.triu_indices(L, -self.sep)]
         proba.sort()
-
         n_top = int(np.round(4.5 * L))
         threshold = proba[-n_top]
+
         A = (cmap > threshold)
         G = Graph(A)
         gds = G.distances()
@@ -89,6 +89,7 @@ class GaussFold:
             gds[missing_idx, :] *= (nonmissing_norm / missing_norm)
             gds[:, missing_idx] = gds[missing_idx, :].T
             """
+            
 
         # Compute confidence indexes
         #weights = cmap - threshold
@@ -155,9 +156,8 @@ class GaussFold:
             self._optimizer = Optimizer()
         
         # Run optimizer on the Gaussian model
-        obj = self._model.evaluate # Objective function
         best_coords = self._optimizer.run(
-                init_solutions, obj, verbose=verbose)
+                init_solutions, self._model, verbose=verbose)
         return best_coords
 
     def create_model(self, gds, ssp, weights):

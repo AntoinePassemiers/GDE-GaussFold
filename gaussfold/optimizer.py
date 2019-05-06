@@ -2,6 +2,8 @@
 # optimizer.py: Heuristic optimizer for Gaussian models
 # author : Antoine Passemiers
 
+from gaussfold.lbfgs import lbfgs
+
 import random
 import numpy as np
 
@@ -22,12 +24,14 @@ class Optimizer:
             population from an initial solution.
         early_stopping (int): Maximum number of iterations without
             score improvement before stopping the algorithm.
+        use_lbfgs (bool): Whether to improve local convergence
+            with L-BFGS algorithm (slows the solver down).
         scores (list): History of best score over time.
     """
 
     def __init__(self, pop_size=2000, n_iter=200000, partition_size=50,
                  mutation_rate=0.5, mutation_std=0.3, init_std=10.,
-                 early_stopping=2):
+                 early_stopping=2, use_lbfgs=False):
         self.pop_size = pop_size
         self.n_iter = n_iter
         self.partition_size = partition_size
@@ -35,6 +39,7 @@ class Optimizer:
         self.mutation_std = mutation_std
         self.init_std = init_std
         self.early_stopping = early_stopping
+        self.use_lbfgs = use_lbfgs
         self.scores = list()
 
     def random_sol(self, initial_solutions):
@@ -115,12 +120,12 @@ class Optimizer:
         individual = self.cross_over(left_winner, right_winner)
         return self.mutate(individual)
 
-    def run(self, initial_solutions, obj, verbose=True):
+    def run(self, initial_solutions, model, verbose=True):
         """Run heuristic optimizer on an initial solution,
         with given objective function.
 
         Parameters:
-            obj (callable): Objective function to be maximized
+            model (:obj:`gaussfold.Model`): Gaussian model
             verbose (bool): Whether to display messages in stdout.
 
         Returns:
@@ -131,6 +136,7 @@ class Optimizer:
         pop = [self.random_sol(initial_solutions) \
                 for i in range(self.pop_size-len(initial_solutions))]
         pop += initial_solutions
+        obj = model.evaluate
 
         # Set initial solution as the best one so far
         self.scores = list()
@@ -169,4 +175,6 @@ class Optimizer:
 
         # Return best solution
         best_coords = pop[np.argmax(scores)]
+        if self.use_lbfgs:
+            best_coords = lbfgs(best_coords, model)
         return best_coords
