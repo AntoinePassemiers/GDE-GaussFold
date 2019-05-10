@@ -134,6 +134,9 @@ class GaussFold:
             except np.linalg.linalg.LinAlgError:
                 if verbose:
                     print('[Warning] Invalid value encountered in deviation corrector')
+            except ValueError:
+                if verbose:
+                    print('[Warning] Invalid value encountered in deviation corrector')
             init_solutions.append(X_transformed)
 
         # Align all initial solution in 3D space
