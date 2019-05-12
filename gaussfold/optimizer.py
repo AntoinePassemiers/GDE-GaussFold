@@ -176,5 +176,7 @@ class Optimizer:
         # Return best solution
         best_coords = pop[np.argmax(scores)]
         if self.use_lbfgs:
-            best_coords = lbfgs(best_coords, model)
+            new_coords = lbfgs(best_coords, model, verbose=verbose)
+            if obj(new_coords) > best_score:
+                best_coords = new_coords
         return best_coords

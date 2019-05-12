@@ -35,7 +35,7 @@ def lbfgs(initial_solution, model, verbose=True):
     # Define callback function
     def callback(x):
         if verbose:
-            print(obj(x))
+            print('L-BFGS: %f' % obj(x))
 
     # Solve the optimization problem
     x0 = initial_solution.flatten()
