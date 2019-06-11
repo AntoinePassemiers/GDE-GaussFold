@@ -68,6 +68,8 @@ class GaussFold:
         threshold = proba[-n_top]
 
         A = (cmap > threshold)
+
+
         G = Graph(A)
         gds = G.distances()
         missing = np.zeros(L, dtype=np.bool)
@@ -89,7 +91,6 @@ class GaussFold:
             gds[missing_idx, :] *= (nonmissing_norm / missing_norm)
             gds[:, missing_idx] = gds[missing_idx, :].T
             """
-            
 
         # Compute confidence indexes
         #weights = cmap - threshold
@@ -98,6 +99,17 @@ class GaussFold:
         weights = np.ones((L, L), dtype=np.float)
         weights[missing, :] = 0.
         weights[:, missing] = 0.
+
+
+
+        import matplotlib.pyplot as plt
+        plt.imshow(gds)
+        plt.colorbar()
+        plt.show()
+        #import sys; sys.exit(0)
+
+        # Graph distances above 14 are statistically impossible
+        gds = np.minimum(gds, 14)
 
         # Apply theoretical linear correspondence between graph
         # distance and Angstroms distance based on statistical

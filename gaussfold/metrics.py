@@ -7,9 +7,9 @@ from scipy.optimize import minimize
 
 
 OPTIMIZATION_BOUNDS = [
-    (  -1000.,   1000.), # Translation on X-axis (in angstroms)
-    (  -1000.,   1000.), # Translation on Y-axis (in angstroms)
-    (  -1000.,   1000.), # Translation on Z-axis (in angstroms)
+    (   -150.,    150.), # Translation on X-axis (in angstroms)
+    (   -150.,    150.), # Translation on Y-axis (in angstroms)
+    (   -150.,    150.), # Translation on Z-axis (in angstroms)
     (-2*np.pi, 2*np.pi), # Rotation around X-axis (in radians)
     (-2*np.pi, 2*np.pi), # Rotation around Y-axis (in radians)
     (-2*np.pi, 2*np.pi), # Rotation around Z-axis (in radians)
@@ -102,8 +102,9 @@ def projection_invariant(method='Maximize'):
             coords_predicted = np.asarray(coords_predicted)[valid_indices]
             coords_target = np.asarray([coords_target[i] for i in valid_indices])
 
+            target_offsets = np.mean(coords_target, axis=0)
             coords_predicted = coords_predicted - np.mean(coords_predicted, axis=0)
-            coords_target = coords_target - np.mean(coords_target, axis=0)
+            coords_target = coords_target - target_offsets
 
             def objective(x):
                 coords_projected = transform(coords_predicted, *x)
@@ -138,6 +139,7 @@ def projection_invariant(method='Maximize'):
                 best_idx = np.argmax(-scores) if maximize else np.argmin(scores)
                 x = sols[best_idx]
                 coords_projected = transform(coords_predicted, *x)
+                coords_projected += target_offsets
                 return best_score, coords_projected
             else:
                 return best_score
