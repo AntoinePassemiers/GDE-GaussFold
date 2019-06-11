@@ -9,7 +9,7 @@ from gaussfold.atom import Bond, Carbon, Oxygen, Nitrogen
 class Arginine(AminoAcid):
 
     def __init__(self):
-        AminoAcid.__init__(self, 'ARG')
+        AminoAcid.__init__(self, 'ARG', 'R')
 
         self.CB = Carbon('CB')
         self.add_atom(self.CB)
@@ -37,5 +37,5 @@ class Arginine(AminoAcid):
         self.add_bond(Bond(self.CG, self.CD))
         self.add_bond(Bond(self.CD, self.NE))
         self.add_bond(Bond(self.NE, self.CZ))
-        self.add_bond(Bond(self.CZ, self.NH1))
-        self.add_bond(Bond(self.CZ, self.NH2))
+        self.add_bond(Bond(self.CZ, self.NH1, order=2)) # TODO
+        self.add_bond(Bond(self.CZ, self.NH2)) # TODO

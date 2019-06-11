@@ -9,4 +9,4 @@ from gaussfold.atom import Bond, Carbon, Oxygen, Nitrogen
 class Glycine(AminoAcid):
 
     def __init__(self):
-        AminoAcid.__init__(self, 'GLY')
+        AminoAcid.__init__(self, 'GLY', 'G')

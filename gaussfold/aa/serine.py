@@ -9,7 +9,7 @@ from gaussfold.atom import Bond, Carbon, Oxygen, Nitrogen
 class Serine(AminoAcid):
 
     def __init__(self):
-        AminoAcid.__init__(self, 'SER')
+        AminoAcid.__init__(self, 'SER', 'S')
 
         self.CB = Carbon('CB')
         self.add_atom(self.CB)

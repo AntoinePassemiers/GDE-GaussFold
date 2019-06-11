@@ -17,6 +17,7 @@ class Bond:
     def compute_distance(self, atom1, atom2, order=1):
         a1, a2 = atom1.element, atom2.element
         elements = set([a1, a2])
+        distance = 2.0 # TODO
         if elements == set(['N', 'C']):
             distance = 1.45
         elif elements == set(['C', 'C']):

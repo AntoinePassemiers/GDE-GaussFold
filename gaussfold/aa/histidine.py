@@ -9,7 +9,7 @@ from gaussfold.atom import Bond, Carbon, Oxygen, Nitrogen
 class Histidine(AminoAcid):
 
     def __init__(self):
-        AminoAcid.__init__(self, 'HIS')
+        AminoAcid.__init__(self, 'HIS', 'H')
 
         self.CB = Carbon('CB')
         self.add_atom(self.CB)

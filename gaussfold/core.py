@@ -100,12 +100,10 @@ class GaussFold:
         weights[missing, :] = 0.
         weights[:, missing] = 0.
 
-
-
-        import matplotlib.pyplot as plt
-        plt.imshow(gds)
-        plt.colorbar()
-        plt.show()
+        #import matplotlib.pyplot as plt
+        #plt.imshow(gds)
+        #plt.colorbar()
+        #plt.show()
         #import sys; sys.exit(0)
 
         # Graph distances above 14 are statistically impossible

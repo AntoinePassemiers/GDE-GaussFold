@@ -9,7 +9,7 @@ from gaussfold.atom import Bond, Carbon, Oxygen, Nitrogen
 class Alanine(AminoAcid):
 
     def __init__(self):
-        AminoAcid.__init__(self, 'ALA')
+        AminoAcid.__init__(self, 'ALA', 'A')
 
         self.CB = Carbon('CB')
         self.add_atom(self.CB)

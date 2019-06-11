@@ -40,12 +40,12 @@ if __name__ == '__main__':
     cmap = ContactParser(L).parse(filepath)
 
     # Create GDE-GaussFold object
-    gf = GaussFold()
+    gf = GaussFold(n_init_sols=1)
 
     # Set optimizer hyper-parameters (optional)
     gf.optimizer = Optimizer(
         pop_size=2000,       # Population size
-        n_iter=200000,       # Maximum number of iterations
+        n_iter=1000,       # Maximum number of iterations
         partition_size=50,   # Partition size for the selection of parents
         mutation_rate=0.5,   # Percentage of child's points to be mutated
         mutation_std=0.3,    # Stdv of mutation noise
@@ -59,3 +59,23 @@ if __name__ == '__main__':
     # and compute TM-score
     print('Compute TM-score')
     print('tm: ', tm_score(coords_predicted, coords_target))
+
+    import numpy as np
+    import matplotlib as mpl
+    from mpl_toolkits.mplot3d import Axes3D
+    import matplotlib.pyplot as plt
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
+    coords_target = np.asarray([x for x in coords_target if x is not None])
+    x = coords_target[:, 0]
+    y = coords_target[:, 1]
+    z = coords_target[:, 2]
+    ax.plot(x, y, z)
+    x = coords_predicted[:, 0]
+    y = coords_predicted[:, 1]
+    z = coords_predicted[:, 2]
+    ax.plot(x, y, z)
+    ax.legend()
+    plt.show()
+
+    import sys; sys.exit(0)

@@ -9,7 +9,7 @@ from gaussfold.atom import Bond, Carbon, Oxygen, Nitrogen
 class Threonine(AminoAcid):
 
     def __init__(self):
-        AminoAcid.__init__(self, 'THR')
+        AminoAcid.__init__(self, 'THR', 'T')
 
         self.CB = Carbon('CB')
         self.add_atom(self.CB)
@@ -20,6 +20,6 @@ class Threonine(AminoAcid):
         self.CG2 = Carbon('CG2')
         self.add_atom(self.CG2)
 
-        self.add_bond(Bond(self.CB, self.CA, distance=1.45))
-        self.add_atom(Bond(self.CB, self.OG1, distance=1.33))
-        self.add_atom(Bond(self.CB, self.CG2, distance=1.49))
+        self.add_bond(Bond(self.CB, self.CA))
+        self.add_atom(Bond(self.CB, self.OG1))
+        self.add_atom(Bond(self.CB, self.CG2))

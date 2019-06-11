@@ -9,8 +9,9 @@ from abc import ABCMeta, abstractmethod
 
 class AminoAcid:
 
-    def __init__(self, aa_name):
+    def __init__(self, aa_name, abbreviation):
         self.aa_name = aa_name
+        self.abbreviation = abbreviation
 
         self.atoms = list()
         self.bonds = list()
@@ -27,18 +28,16 @@ class AminoAcid:
         self.O = Oxygen('O')
         self.add_atom(self.O)
 
-        self.add_bond(self.N, self.CA)
-        self.add_bond(self.CA, self.C)
-        self.add_bond(self.C, self.O, order=2)
+        self.add_bond(Bond(self.N, self.CA))
+        self.add_bond(Bond(self.CA, self.C))
+        self.add_bond(Bond(self.C, self.O, order=2))
 
     def add_atom(self, atom):
         if atom not in self.atoms:
             self.atoms.append(atom)
 
-    def add_bond(self, atom1, atom2):
-        assert(atom1 in self.atoms)
-        assert(atom2 in self.atoms)
-        self.bonds.append(Bond(atom1, atom2))
+    def add_bond(self, bond):
+        self.bonds.append(bond)
 
     def __to_pdb__(self, serial, chain_id, res_seq):
         s = ''
