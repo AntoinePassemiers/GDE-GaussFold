@@ -28,6 +28,7 @@ class AminoAcidModel:
         self.weights = np.ones((self.L, self.L), dtype=np.float)
         self.triu_indices = np.triu_indices(self.L, k=-1)
         self.tril_indices = np.tril_indices(self.L, k=0)
+        self.distances = np.empty((self.L, self.L), dtype=np.float)
         self.weighted = False
 
     def add_restraint(self, i, j, mu, sigma, weight=1.):
@@ -56,8 +57,8 @@ class AminoAcidModel:
         Returns:
             float: Log-likelihood of the coordinates given the Gaussian parameters.
         """
-        distances = scipy.spatial.distance.cdist(coords, coords, metric='euclidean')
-        distances = distances[self.triu_indices]
+        scipy.spatial.distance.cdist(coords, coords, metric='euclidean', out=self.distances)
+        distances = self.distances[self.triu_indices]
         mu, sigma = self.mu[self.triu_indices], self.sigma[self.triu_indices]
 
         indices = ~np.isnan(mu)
@@ -82,7 +83,8 @@ class AminoAcidModel:
                 with respect to 3D coordinates.
         """
         L = coords.shape[0]
-        D = scipy.spatial.distance.cdist(coords, coords, metric='euclidean')
+        scipy.spatial.distance.cdist(coords, coords, metric='euclidean', out=self.distances)
+        D = self.distances
         M, S = self.mu, self.sigma
 
 

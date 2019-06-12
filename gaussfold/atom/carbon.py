@@ -9,3 +9,6 @@ class Carbon(Atom):
 
     def __init__(self, name, **kwargs):
         Atom.__init__(self, 'C', name, **kwargs)
+
+    def in_methylene(self):
+        return False # TODO

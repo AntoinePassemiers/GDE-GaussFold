@@ -75,6 +75,7 @@ class GaussFold:
         G = Graph(A)
         gds = G.distances()
         missing = np.zeros(L, dtype=np.bool)
+        """
         if not G.is_connected():
             missing = (gds == 0).all(axis=0)
             missing_idx = np.where(missing)[0]
@@ -83,8 +84,6 @@ class GaussFold:
             A[missing_idx, connected_idx] = 1
             A[connected_idx, missing_idx] = 1
             G = Graph(A)
-
-            """
             gds[missing_idx, :] = G.distances()[missing_idx, :]
             gds[:, missing_idx] = gds[missing_idx, :].T
             missing_norm = gds[missing, :].mean()
@@ -92,7 +91,7 @@ class GaussFold:
             gds = gds.astype(np.float)
             gds[missing_idx, :] *= (nonmissing_norm / missing_norm)
             gds[:, missing_idx] = gds[missing_idx, :].T
-            """
+        """
 
         # Compute confidence indexes
         #weights = cmap - threshold
@@ -169,16 +168,39 @@ class GaussFold:
                 init_solutions, self._model, verbose=verbose)
 
 
-        chain = Chain.from_string(seq)
-        atoms = chain.atoms()
-        model = AllAtomModel(len(atoms))
-        for i, atom1 in enumerate(atoms):
-            for j, atom2 in enumerate(atoms):
-                if atom1.is_bonded(atom2):
-                    pass # TODO
-                else:
-                    pass # TODO
-                # TODO
+        #chain = Chain.from_string(seq)
+        #atoms = chain.atoms()
+        #model = AllAtomModel(len(atoms))
+        #for i, atom1 in enumerate(atoms):
+        #    for j, atom2 in enumerate(atoms[:i]):
+        #        a1, a2 = atom1.element, atom2.element
+        #        if ord(a2) < ord(a1):
+        #            a1, a2 = a2, a1
+        #            atom1, atom2 = atom2, atom1
+        #        elements = (a1, a2)
+        #
+        #        if elements == ('O', 'O'):
+        #            model.add_uniform_restraint(i, j, 2.6)
+        #        elif elements == ('N', 'O'):
+        #            model.add_uniform_restraint(i, j, 2.6)
+        #        elif elements == ('C', 'O'):
+        #            model.add_uniform_restraint(i, j, 2.7)
+        #        elif elements == ('N', 'N'):
+        #            model.add_uniform_restraint(i, j, 2.6)
+        #        elif elements == ('C', 'N'):
+        #            model.add_uniform_restraint(i, j, 2.8)
+        #        elif elements == ('C', 'C'):
+        #            if atom1.in_methylene() or atom2.in_methylene():
+        #                if atom1.in_methylene() and atom2.in_methylene():
+        #                    model.add_uniform_restraint(i, j, 3.0)
+        #                else:
+        #                    model.add_uniform_restraint(i, j, 3.0)
+        #            else:
+        #                model.add_uniform_restraint(i, j, 2.9)
+        #        # TODO
+        #solutions = [np.zeros((len(atoms), 3))]
+        #optimizer = Optimizer(pop_size=50, partition_size=5, n_iter=1000)
+        #optimizer.run(solutions, model)
 
         return best_coords
 

@@ -17,6 +17,7 @@ class Atom(metaclass=ABCMeta):
         self.z = float(coords[2])
 
     def add_bonded_atom(self, atom):
+        assert(isinstance(atom, Atom))
         if atom not in self.bonded_atoms:
             self.bonded_atoms.append(atom)
 
