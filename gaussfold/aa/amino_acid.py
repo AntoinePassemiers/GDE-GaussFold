@@ -2,7 +2,7 @@
 # amino_acid.py: Base class for amino acids
 # author : Antoine Passemiers
 
-from gaussfold.atom import Bond, Carbon, Oxygen, Nitrogen
+from gaussfold.atom import Atom, Bond, Carbon, Oxygen, Nitrogen
 
 from abc import ABCMeta, abstractmethod
 
@@ -33,10 +33,12 @@ class AminoAcid:
         self.add_bond(Bond(self.C, self.O, order=2))
 
     def add_atom(self, atom):
+        assert(isinstance(atom, Atom))
         if atom not in self.atoms:
             self.atoms.append(atom)
 
     def add_bond(self, bond):
+        assert(isinstance(bond, Bond))
         self.bonds.append(bond)
 
     def __to_pdb__(self, serial, chain_id, res_seq):

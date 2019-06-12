@@ -12,4 +12,4 @@ setup(
     url='https://github.com/AntoinePassemiers/GDE-GaussFold',
     author='Antoine Passemiers',
     author_email='apassemi@ulb.ac.be',
-    packages=['gaussfold'])
+    packages=['gaussfold', 'gaussfold.model', 'gaussfold.aa', 'gaussfold.atom', 'gaussfold.chain'])

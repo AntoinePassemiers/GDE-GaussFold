@@ -6,6 +6,7 @@ from gaussfold import GaussFold, Optimizer, tm_score
 from gaussfold import PDBParser, SS3Parser, FastaParser, ContactParser
 
 import os
+import numpy as np
 
 
 DATA_FOLDER = 'data'
@@ -37,7 +38,8 @@ if __name__ == '__main__':
     # Parse predicted contact probabilities
     L = len(sequence) # Number of residues
     filepath = os.path.join(DATA_FOLDER, 'predicted.con')
-    cmap = ContactParser(L).parse(filepath)
+    #cmap = ContactParser(L).parse(filepath)
+    cmap = 1. / (1 + np.exp(distances - 8.))
 
     # Create GDE-GaussFold object
     gf = GaussFold(n_init_sols=1)
@@ -45,7 +47,7 @@ if __name__ == '__main__':
     # Set optimizer hyper-parameters (optional)
     gf.optimizer = Optimizer(
         pop_size=2000,       # Population size
-        n_iter=1000,       # Maximum number of iterations
+        n_iter=1000,        # Maximum number of iterations
         partition_size=50,   # Partition size for the selection of parents
         mutation_rate=0.5,   # Percentage of child's points to be mutated
         mutation_std=0.3,    # Stdv of mutation noise
@@ -53,12 +55,13 @@ if __name__ == '__main__':
         early_stopping=5000) # Maximum number of iterations without improvement
 
     # Run GDE-GaussFold
-    coords_predicted = gf.run(cmap, ssp, verbose=True)
+    coords_predicted = gf.run(cmap, ssp, sequence, verbose=True)
 
     # Make 3D alignement between native structure and predicted structure
     # and compute TM-score
     print('Compute TM-score')
-    print('tm: ', tm_score(coords_predicted, coords_target))
+    tm, coords_predicted = tm_score(coords_predicted, coords_target, return_coords=True)
+    print('tm: ', tm)
 
     import numpy as np
     import matplotlib as mpl
@@ -77,5 +80,3 @@ if __name__ == '__main__':
     ax.plot(x, y, z)
     ax.legend()
     plt.show()
-
-    import sys; sys.exit(0)

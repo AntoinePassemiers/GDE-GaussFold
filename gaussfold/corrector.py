@@ -22,7 +22,7 @@ class DeviationCorrector:
         inter_residue
     """
 
-    CA_CA_DISTANCE = 3.8
+    CA_CA_DISTANCE = 3.82
 
     def __init__(self, L):
         """Constructs a deviation corrector.

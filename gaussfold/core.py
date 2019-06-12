@@ -2,10 +2,12 @@
 # core.py: GDE-GaussFold core algorithm
 # author : Antoine Passemiers
 
+from gaussfold.chain.chain import Chain
 from gaussfold.corrector import DeviationCorrector
 from gaussfold.graph import Graph
 from gaussfold.metrics import tm_score
-from gaussfold.model import Model
+from gaussfold.model.amino_acid_model import AminoAcidModel
+from gaussfold.model.all_atom_model import AllAtomModel
 from gaussfold.optimizer import Optimizer
 
 import numpy as np
@@ -36,7 +38,7 @@ class GaussFold:
         self._model = None
         self._optimizer = None
 
-    def run(self, cmap, ssp, verbose=True):
+    def run(self, cmap, ssp, seq, verbose=True):
         """Runs GDE-GaussFold algorithm.
 
         Parameters:
@@ -46,6 +48,7 @@ class GaussFold:
             ssp (:obj:`np.ndarray`): Array of shape (L,) representing
                 3-state secondary structure prediction.
                 0 stands for 'H', 1 for 'E' and 2 for 'C'.
+            seq (str): Protein primary structure.
             verbose (bool): Whether to display messages in stdout.
 
         Returns:
@@ -68,7 +71,6 @@ class GaussFold:
         threshold = proba[-n_top]
 
         A = (cmap > threshold)
-
 
         G = Graph(A)
         gds = G.distances()
@@ -99,12 +101,6 @@ class GaussFold:
         weights = np.ones((L, L), dtype=np.float)
         weights[missing, :] = 0.
         weights[:, missing] = 0.
-
-        #import matplotlib.pyplot as plt
-        #plt.imshow(gds)
-        #plt.colorbar()
-        #plt.show()
-        #import sys; sys.exit(0)
 
         # Graph distances above 14 are statistically impossible
         gds = np.minimum(gds, 14)
@@ -156,7 +152,7 @@ class GaussFold:
                     init_solutions[i], init_solutions[0], return_coords=True)[1]
 
         # Create Gaussian model if not set by the user
-        if not isinstance(self._model, Model):
+        if not isinstance(self._model, AminoAcidModel):
             if verbose:
                 print('Model not set by user. Creating model from scratch...')
             self._model = self.create_model(gds, ssp, weights)
@@ -171,6 +167,19 @@ class GaussFold:
         # Run optimizer on the Gaussian model
         best_coords = self._optimizer.run(
                 init_solutions, self._model, verbose=verbose)
+
+
+        chain = Chain.from_string(seq)
+        atoms = chain.atoms()
+        model = AllAtomModel(len(atoms))
+        for i, atom1 in enumerate(atoms):
+            for j, atom2 in enumerate(atoms):
+                if atom1.is_bonded(atom2):
+                    pass # TODO
+                else:
+                    pass # TODO
+                # TODO
+
         return best_coords
 
     def create_model(self, gds, ssp, weights):
@@ -185,7 +194,7 @@ class GaussFold:
             weights (:obj:`np.ndarray`): Matrix of restraint weights
 
         Returns:
-            :obj:`gaussold.Model`: Gaussian model with
+            :obj:`gaussold.model.AminoAcidModel`: Gaussian model with
                 restraints defined for each pair of residues.
         """
         # Cut predicted secondary structure
@@ -201,7 +210,7 @@ class GaussFold:
         # Instantiate an empty model. Restraints have
         # to be defined for each pair of residues before
         # optimizing this model.
-        model = Model(L)
+        model = AminoAcidModel(L)
 
         # Add backbone restraints:
         # Restraints based on average
@@ -217,7 +226,7 @@ class GaussFold:
                 if gds[i, j] > 0:
                     mu = gds[i, j] * 5.72
                     sigma = gds[i, j] * 1.34
-                    model.add_restraint(i, j, mu, sigma, weight=weights[i, j])
+                    model.add_restraint(i, j, mu, sigma, weights[i, j])
 
         # Add restraints based on contacts in predicted
         # secondary structures
@@ -237,7 +246,7 @@ class GaussFold:
                                 model.add_restraint(i, j, 6.42, 1.04, weight=weights[i, j])
                         elif ssp[i] == 1: # Beta strand
                             if sep == 1:
-                                model.add_restraint(i, j, 3.80, 0.28, weight=weights[i, j])
+                                model.add_restraint(i, j, 3.82, 0.28, weight=weights[i, j])
                             elif sep == 2:
                                 model.add_restraint(i, j, 6.66, 0.30, weight=weights[i, j])
                     elif (ssp[i] == 0 and ssp[j] == 1) or (ssp[i] == 1 and ssp[j] == 0):

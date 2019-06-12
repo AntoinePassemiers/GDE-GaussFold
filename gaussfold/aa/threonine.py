@@ -21,5 +21,5 @@ class Threonine(AminoAcid):
         self.add_atom(self.CG2)
 
         self.add_bond(Bond(self.CB, self.CA))
-        self.add_atom(Bond(self.CB, self.OG1))
-        self.add_atom(Bond(self.CB, self.CG2))
+        self.add_bond(Bond(self.CB, self.OG1))
+        self.add_bond(Bond(self.CB, self.CG2))

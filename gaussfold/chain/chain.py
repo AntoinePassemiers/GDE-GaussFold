@@ -3,6 +3,7 @@
 # author : Antoine Passemiers
 
 from gaussfold.aa import *
+from gaussfold.atom import Bond
 
 
 class Chain:
@@ -11,8 +12,16 @@ class Chain:
         self.amino_acids = list()
 
     def add(self, amino_acid):
+        if len(self.amino_acids) > 0:
+            peptide_bond = Bond(self.amino_acids[-1].C, amino_acid.N)
+            self.amino_acids[-1].add_bond(peptide_bond)
         self.amino_acids.append(amino_acid)
-        # TODO: add peptide bonds
+
+    def atoms(self):
+        atom_list = list()
+        for amino_acid in self.amino_acids:
+            atom_list += list(amino_acid.atoms)
+        return atom_list
 
     @staticmethod
     def from_string(s):
@@ -22,5 +31,5 @@ class Chain:
 
         chain = Chain()
         for c in s:
-            chain.add(abb_to_clk[c])
+            chain.add(abb_to_clk[c]())
         return chain

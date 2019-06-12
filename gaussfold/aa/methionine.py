@@ -3,7 +3,7 @@
 # author : Antoine Passemiers
 
 from gaussfold.aa.amino_acid import AminoAcid
-from gaussfold.atom import Bond, Carbon, Oxygen, Nitrogen, Sulfur
+from gaussfold.atom import Bond, Carbon, Nitrogen, Sulfur
 
 
 class Methionine(AminoAcid):

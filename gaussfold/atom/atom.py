@@ -28,6 +28,9 @@ class Atom(metaclass=ABCMeta):
     def get_coords(self):
         return (self.x, self.y, self.z)
 
+    def is_bonded(self, atom):
+        return (atom in self.bonded_atoms)
+
     def __to_pdb__(self, serial, chain_id, res_seq):
         s = 'ATOM  '
         s += str(serial).rjust(5) + '  '

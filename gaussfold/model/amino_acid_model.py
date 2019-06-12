@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-# restraint.py
+# amino_acid_model.py
 # author : Antoine Passemiers
 
 import numpy as np
 import scipy.spatial
 
 
-class Model:
+class AminoAcidModel:
     """Gaussian-restrained 3D model of a protein.
 
     Attributes:
