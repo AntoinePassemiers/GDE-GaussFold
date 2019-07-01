@@ -2,6 +2,7 @@
 # atom.py: Base class for atoms
 # author : Antoine Passemiers
 
+import numpy as np
 from abc import ABCMeta, abstractmethod
 
 
@@ -12,10 +13,7 @@ class Atom(metaclass=ABCMeta):
         self.name = name
         self.identifier = identifier
         self.bonded_atoms = list()
-
-        self.x = float(coords[0])
-        self.y = float(coords[1])
-        self.z = float(coords[2])
+        self.coords = np.asarray(list(coords), dtype=np.float)
 
     def add_bonded_atom(self, atom):
         assert(isinstance(atom, Atom))
@@ -23,12 +21,12 @@ class Atom(metaclass=ABCMeta):
             self.bonded_atoms.append(atom)
 
     def set_coords(self, x, y, z):
-        self.x = float(x)
-        self.y = float(y)
-        self.z = float(z)
+        self.coords[0] = x
+        self.coords[1] = y
+        self.coords[2] = z
 
     def get_coords(self):
-        return (self.x, self.y, self.z)
+        return self.coords
 
     def is_bonded(self, atom):
         return (atom in self.bonded_atoms)
@@ -48,3 +46,15 @@ class Atom(metaclass=ABCMeta):
         s += self.element
         s += '\n'
         return s
+
+    @property
+    def x(self):
+        return self.coords[0]
+
+    @property
+    def y(self):
+        return self.coords[1]
+
+    @property
+    def z(self):
+        return self.coords[2]

@@ -8,38 +8,53 @@ import scipy.spatial
 
 class AllAtomModel:
 
-    def __init__(self, n_atoms, beta=1e+7):
-        self.n_atoms = n_atoms
-        self.beta = beta
+    def __init__(self, chain):
+        self.chain = chain
+        self.n_atoms = len(self.chain.atoms())
+        self.n_residues = len(self.chain)
         self.triu_indices = np.triu_indices(self.n_atoms, k=-1)
         self.distances = np.empty((self.n_atoms, self.n_atoms), dtype=np.float)
 
-        # Parameters for modelling gaussian restraints
-        self.mu = np.full((self.n_atoms, self.n_atoms), np.nan, dtype=np.float)
-        self.sigma = np.full((self.n_atoms, self.n_atoms), np.nan, dtype=np.float)
+        # Parameters for modelling distance restraints
+        self.lb = np.full((self.n_atoms, self.n_atoms), 0., dtype=np.float)
+        self.ub = np.full((self.n_atoms, self.n_atoms), np.inf, dtype=np.float)
 
-        # Parameters for modelling uniform restraints
-        self.lb = np.full((self.n_atoms, self.n_atoms), np.nan, dtype=np.float)
+        # Parameters for modelling angle restraints
+        self.phi_lb = np.full(self.n_residues, 0., dtype=np.float)
+        self.phi_ub = np.full(self.n_residues, np.inf, dtype=np.float)
+        self.psi_lb = np.full(self.n_residues, 0., dtype=np.float)
+        self.psi_ub = np.full(self.n_residues, np.inf, dtype=np.float)
 
-    def add_gaussian_restraint(self, i, j, mu, sigma):
-        self.mu[i, j] = self.mu[j, i] = mu
-        self.sigma[i, j] = self.sigma[j, i] = sigma
+    def add_distance_restraint(self, i, j, lb=None, ub=None):
+        if lb is not None:
+            self.lb[i, j] = self.lb[j, i] = lb
+        if ub is not None:
+            self.ub[i, j] = self.ub[j, i] = ub
 
-    def add_uniform_restraint(self, i, j, lb):
-        self.lb[i, j] = self.lb[j, i] = lb
+    def add_angle_restraint(self, i, phi_lb=None, phi_ub=None, psi_lb=None, psi_ub=None):
+        if phi_lb is not None:
+            self.phi_lb[i] = phi_lb
+        if phi_ub is not None:
+            self.phi_ub[i] = phi_ub
+        if psi_lb is not None:
+            self.psi_lb[i] = psi_lb
+        if psi_ub is not None:
+            self.psi_ub[i] = psi_ub
 
     def evaluate(self, coords):
+        self.chain.set_atoms_coords(coords)
+        
         scipy.spatial.distance.cdist(coords, coords, metric='euclidean', out=self.distances)
         distances = self.distances[self.triu_indices]
-        mu, sigma = self.mu[self.triu_indices], self.sigma[self.triu_indices]
         lb = self.lb[self.triu_indices]
+        ub = self.ub[self.triu_indices]
+        cost = (distances < lb).sum()
+        cost += (distances > ub).sum()
 
-        indices_g = ~np.isnan(mu)
-        distances_g, mu, sigma = distances[indices_g], mu[indices_g], sigma[indices_g]
+        phi, psi = self.chain.dihedral_angles()
+        cost += (phi < self.phi_lb).sum()
+        cost += (phi > self.phi_ub).sum()
+        cost += (psi < self.psi_lb).sum()
+        cost += (psi > self.psi_ub).sum()
 
-        indices_u = ~np.isnan(lb)
-        distances_u, lb = distances[indices_u], lb[indices_u]
-
-        logp = ((distances_g - mu) / sigma) ** 2.
-        penalties = (distances_u < lb)
-        return -0.5 * logp.sum() - self.beta * penalties.sum()
+        return -cost

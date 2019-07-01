@@ -3,7 +3,11 @@
 # author : Antoine Passemiers
 
 from gaussfold.aa import *
+from gaussfold.aa.arginine import Arginine
+from gaussfold.aa.amino_acid import AminoAcid
 from gaussfold.atom import Bond
+
+import numpy as np
 
 
 class Chain:
@@ -25,6 +29,21 @@ class Chain:
         self.amino_acids.append(amino_acid)
         self.update()
 
+    def get_atoms_coords(self):
+        atoms = self.atoms()
+        coords = np.empty((len(atoms), 3), dtype=np.float)
+        for i, atom in enumerate(atoms):
+            assert(atom.identifier == i)
+            coords[i, :] = atom.get_coords()
+        return coords
+
+    def set_atoms_coords(self, coords):
+        atoms = self.atoms()
+        for i, atom in enumerate(atoms):
+            assert(atom.identifier == i)
+            x, y, z = coords[i, :]
+            atom.set_coords(x, y, z)
+
     def atoms(self):
         atom_list = list()
         for amino_acid in self.amino_acids:
@@ -36,6 +55,15 @@ class Chain:
         for amino_acid in self.amino_acids:
             bond_list += list(amino_acid.bonds)
         return bond_list
+
+    def dihedral_angles(self):
+        phi = np.zeros(self.__len__(), dtype=np.float)
+        psi = np.zeros(self.__len__(), dtype=np.float)
+        # TODO: terminal amino acids
+        for i in range(1, self.__len__() - 1):
+            phi[i] = self.amino_acids[i].phi(self.amino_acids[i-1].C)
+            psi[i] = self.amino_acids[i].psi(self.amino_acids[i+1].N)
+        return phi, psi
 
     @staticmethod
     def from_string(s):

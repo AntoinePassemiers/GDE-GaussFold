@@ -1,4 +1,5 @@
 from .alanine import *
+from .amino_acid import *
 from .arginine import *
 from .asparagine import *
 from .aspartic_acid import *

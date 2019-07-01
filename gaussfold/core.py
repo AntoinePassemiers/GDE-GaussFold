@@ -2,6 +2,7 @@
 # core.py: GDE-GaussFold core algorithm
 # author : Antoine Passemiers
 
+from gaussfold.aa import Glycine
 from gaussfold.chain.chain import Chain
 from gaussfold.corrector import DeviationCorrector
 from gaussfold.graph import Graph
@@ -169,7 +170,7 @@ class GaussFold:
 
 
         chain = Chain.from_string(seq)
-        model = self.create_all_atom_model(chain, self._model)
+        model = self.create_all_atom_model(chain, gds, contact_threshold=threshold)
 
         solution = list()
         for k, amino_acid in enumerate(chain.amino_acids):
@@ -178,12 +179,14 @@ class GaussFold:
         solution = np.asarray(solution)
 
         solutions = [solution]
-        optimizer = Optimizer(pop_size=200, partition_size=20, n_iter=10000, init_std=5., mutation_rate=.2)
+        optimizer = Optimizer(
+                pop_size=200, partition_size=80, n_iter=3000, init_std=10.,
+                mutation_rate=.5, mutation_std=0.5, use_lbfgs=False)
         all_coords = optimizer.run(solutions, model)
 
         best_coords = list()
         for k in range(L):
-            i = chain[k].CA.identifier
+            i = (chain[k].CB if not isinstance(chain[k], Glycine) else chain[k].CA).identifier
             best_coords.append(all_coords[i, :])
         best_coords = np.asarray(best_coords)
         return best_coords
@@ -272,52 +275,17 @@ class GaussFold:
                             model.add_restraint(i, j, 6.44, 1.00, weight=weights[i, j])
         return model
 
-    def create_all_atom_model(self, chain, amino_acid_model):
+    def create_all_atom_model(self, chain, gds, contact_threshold):
         atoms = chain.atoms()
-        model = AllAtomModel(len(atoms), beta=1e+4)
-        for i, atom1 in enumerate(atoms):
-            for j, atom2 in enumerate(atoms[:i]):
-                a1, a2 = atom1.element, atom2.element
-                if ord(a2) < ord(a1):
-                    a1, a2 = a2, a1
-                    atom1, atom2 = atom2, atom1
-                elements = (a1, a2)
-        
-                if elements == ('O', 'O'):
-                    model.add_uniform_restraint(i, j, 2.6)
-                elif elements == ('N', 'O'):
-                    model.add_uniform_restraint(i, j, 2.6)
-                elif elements == ('C', 'O'):
-                    model.add_uniform_restraint(i, j, 2.7)
-                elif elements == ('N', 'N'):
-                    model.add_uniform_restraint(i, j, 2.6)
-                elif elements == ('C', 'N'):
-                    model.add_uniform_restraint(i, j, 2.8)
-                elif elements == ('C', 'C'):
-                    if atom1.in_methylene() or atom2.in_methylene():
-                        if atom1.in_methylene() and atom2.in_methylene():
-                            model.add_uniform_restraint(i, j, 3.0)
-                        else:
-                            model.add_uniform_restraint(i, j, 3.0)
-                    else:
-                        model.add_uniform_restraint(i, j, 2.9)
-                # TODO
+        model = AllAtomModel(chain)
 
-        L = amino_acid_model.mu.shape[0]
-        for i in range(L):
+        for i in range(len(chain)):
             for j in range(max(0, i-self.sep)):
-                a = chain[i].CA.identifier
-                b = chain[j].CA.identifier
-                mu = amino_acid_model.mu[i, j]
-                sigma = amino_acid_model.sigma[i, j]
-                model.add_gaussian_restraint(a, b, mu, sigma)
+                if gds[i, j] == 1: # Contact
+                    a = (chain[i].CB if not isinstance(chain[i], Glycine) else chain[i].CA).identifier
+                    b = (chain[j].CB if not isinstance(chain[j], Glycine) else chain[j].CA).identifier
+                    model.add_distance_restraint(a, b, lb=3.5, ub=8.) # TODO
 
-        for bond in chain.bonds():
-            i = bond.atom1.identifier
-            j = bond.atom2.identifier
-            mu = bond.distance
-            sigma = bond.sigma
-            model.add_gaussian_restraint(i, j, mu, sigma)
         return model
 
     @property

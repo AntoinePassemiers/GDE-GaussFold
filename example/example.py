@@ -47,7 +47,7 @@ if __name__ == '__main__':
     # Set optimizer hyper-parameters (optional)
     gf.optimizer = Optimizer(
         pop_size=2000,       # Population size
-        n_iter=1000,        # Maximum number of iterations
+        n_iter=10000,        # Maximum number of iterations
         partition_size=50,   # Partition size for the selection of parents
         mutation_rate=0.5,   # Percentage of child's points to be mutated
         mutation_std=0.3,    # Stdv of mutation noise

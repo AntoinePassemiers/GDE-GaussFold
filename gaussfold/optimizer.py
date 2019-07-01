@@ -140,7 +140,7 @@ class Optimizer:
 
         # Set initial solution as the best one so far
         self.scores = list()
-        best_score = obj(pop[-1])
+        best_score = -np.inf
         best_iteration = 0
 
         # Compute fitness functions on all individuals
