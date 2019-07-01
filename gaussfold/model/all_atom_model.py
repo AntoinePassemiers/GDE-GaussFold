@@ -8,7 +8,7 @@ import scipy.spatial
 
 class AllAtomModel:
 
-    def __init__(self, n_atoms, beta=1.):
+    def __init__(self, n_atoms, beta=1e+7):
         self.n_atoms = n_atoms
         self.beta = beta
         self.triu_indices = np.triu_indices(self.n_atoms, k=-1)

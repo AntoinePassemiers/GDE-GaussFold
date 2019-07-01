@@ -57,16 +57,24 @@ if __name__ == '__main__':
     # Run GDE-GaussFold
     coords_predicted = gf.run(cmap, ssp, sequence, verbose=True)
 
+    import numpy as np
+    import matplotlib as mpl
+    from mpl_toolkits.mplot3d import Axes3D
+    import matplotlib.pyplot as plt
+    import scipy.spatial
+    distances_predicted = scipy.spatial.distance.cdist(
+            coords_predicted, coords_predicted, metric='euclidean')
+    plt.imshow(distances_predicted)
+    plt.show()
+
+
     # Make 3D alignement between native structure and predicted structure
     # and compute TM-score
     print('Compute TM-score')
     tm, coords_predicted = tm_score(coords_predicted, coords_target, return_coords=True)
     print('tm: ', tm)
 
-    import numpy as np
-    import matplotlib as mpl
-    from mpl_toolkits.mplot3d import Axes3D
-    import matplotlib.pyplot as plt
+
     fig = plt.figure()
     ax = fig.gca(projection='3d')
     coords_target = np.asarray([x for x in coords_target if x is not None])

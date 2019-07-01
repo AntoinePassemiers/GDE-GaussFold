@@ -7,9 +7,10 @@ from abc import ABCMeta, abstractmethod
 
 class Atom(metaclass=ABCMeta):
 
-    def __init__(self, element, name, coords=(0., 0., 0.)):
+    def __init__(self, element, name, coords=(0., 0., 0.), identifier=None):
         self.element = element
         self.name = name
+        self.identifier = identifier
         self.bonded_atoms = list()
 
         self.x = float(coords[0])

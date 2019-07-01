@@ -31,7 +31,7 @@ class Optimizer:
 
     def __init__(self, pop_size=2000, n_iter=200000, partition_size=50,
                  mutation_rate=0.5, mutation_std=0.3, init_std=10.,
-                 early_stopping=100, use_lbfgs=False):
+                 early_stopping=300, use_lbfgs=False):
         self.pop_size = pop_size
         self.n_iter = n_iter
         self.partition_size = partition_size

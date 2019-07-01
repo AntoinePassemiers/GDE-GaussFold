@@ -168,40 +168,24 @@ class GaussFold:
                 init_solutions, self._model, verbose=verbose)
 
 
-        #chain = Chain.from_string(seq)
-        #atoms = chain.atoms()
-        #model = AllAtomModel(len(atoms))
-        #for i, atom1 in enumerate(atoms):
-        #    for j, atom2 in enumerate(atoms[:i]):
-        #        a1, a2 = atom1.element, atom2.element
-        #        if ord(a2) < ord(a1):
-        #            a1, a2 = a2, a1
-        #            atom1, atom2 = atom2, atom1
-        #        elements = (a1, a2)
-        #
-        #        if elements == ('O', 'O'):
-        #            model.add_uniform_restraint(i, j, 2.6)
-        #        elif elements == ('N', 'O'):
-        #            model.add_uniform_restraint(i, j, 2.6)
-        #        elif elements == ('C', 'O'):
-        #            model.add_uniform_restraint(i, j, 2.7)
-        #        elif elements == ('N', 'N'):
-        #            model.add_uniform_restraint(i, j, 2.6)
-        #        elif elements == ('C', 'N'):
-        #            model.add_uniform_restraint(i, j, 2.8)
-        #        elif elements == ('C', 'C'):
-        #            if atom1.in_methylene() or atom2.in_methylene():
-        #                if atom1.in_methylene() and atom2.in_methylene():
-        #                    model.add_uniform_restraint(i, j, 3.0)
-        #                else:
-        #                    model.add_uniform_restraint(i, j, 3.0)
-        #            else:
-        #                model.add_uniform_restraint(i, j, 2.9)
-        #        # TODO
-        #solutions = [np.zeros((len(atoms), 3))]
-        #optimizer = Optimizer(pop_size=50, partition_size=5, n_iter=1000)
-        #optimizer.run(solutions, model)
+        chain = Chain.from_string(seq)
+        model = self.create_all_atom_model(chain, self._model)
 
+        solution = list()
+        for k, amino_acid in enumerate(chain.amino_acids):
+            for _ in range(len(amino_acid.atoms)):
+                solution.append(best_coords[k, :])
+        solution = np.asarray(solution)
+
+        solutions = [solution]
+        optimizer = Optimizer(pop_size=200, partition_size=20, n_iter=10000, init_std=5., mutation_rate=.2)
+        all_coords = optimizer.run(solutions, model)
+
+        best_coords = list()
+        for k in range(L):
+            i = chain[k].CA.identifier
+            best_coords.append(all_coords[i, :])
+        best_coords = np.asarray(best_coords)
         return best_coords
 
     def create_model(self, gds, ssp, weights):
@@ -250,6 +234,12 @@ class GaussFold:
                     sigma = gds[i, j] * 1.34
                     model.add_restraint(i, j, mu, sigma, weights[i, j])
 
+        # Regular contacts
+        for i in range(L):
+            for j in range(max(0, i-self.sep)):
+                if gds[i, j] == 1:
+                    model.add_restraint(i, j, 3.82, 0.35, weight=1.)
+
         # Add restraints based on contacts in predicted
         # secondary structures
         for i in range(L):
@@ -280,6 +270,54 @@ class GaussFold:
                     elif (ssp[i] == 1 and ssp[j] == 2) or (ssp[i] == 2 and ssp[j] == 1):
                         if sep >= 4: # Beta/coil contact
                             model.add_restraint(i, j, 6.44, 1.00, weight=weights[i, j])
+        return model
+
+    def create_all_atom_model(self, chain, amino_acid_model):
+        atoms = chain.atoms()
+        model = AllAtomModel(len(atoms), beta=1e+4)
+        for i, atom1 in enumerate(atoms):
+            for j, atom2 in enumerate(atoms[:i]):
+                a1, a2 = atom1.element, atom2.element
+                if ord(a2) < ord(a1):
+                    a1, a2 = a2, a1
+                    atom1, atom2 = atom2, atom1
+                elements = (a1, a2)
+        
+                if elements == ('O', 'O'):
+                    model.add_uniform_restraint(i, j, 2.6)
+                elif elements == ('N', 'O'):
+                    model.add_uniform_restraint(i, j, 2.6)
+                elif elements == ('C', 'O'):
+                    model.add_uniform_restraint(i, j, 2.7)
+                elif elements == ('N', 'N'):
+                    model.add_uniform_restraint(i, j, 2.6)
+                elif elements == ('C', 'N'):
+                    model.add_uniform_restraint(i, j, 2.8)
+                elif elements == ('C', 'C'):
+                    if atom1.in_methylene() or atom2.in_methylene():
+                        if atom1.in_methylene() and atom2.in_methylene():
+                            model.add_uniform_restraint(i, j, 3.0)
+                        else:
+                            model.add_uniform_restraint(i, j, 3.0)
+                    else:
+                        model.add_uniform_restraint(i, j, 2.9)
+                # TODO
+
+        L = amino_acid_model.mu.shape[0]
+        for i in range(L):
+            for j in range(max(0, i-self.sep)):
+                a = chain[i].CA.identifier
+                b = chain[j].CA.identifier
+                mu = amino_acid_model.mu[i, j]
+                sigma = amino_acid_model.sigma[i, j]
+                model.add_gaussian_restraint(a, b, mu, sigma)
+
+        for bond in chain.bonds():
+            i = bond.atom1.identifier
+            j = bond.atom2.identifier
+            mu = bond.distance
+            sigma = bond.sigma
+            model.add_gaussian_restraint(i, j, mu, sigma)
         return model
 
     @property
