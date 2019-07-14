@@ -8,10 +8,13 @@ from abc import ABCMeta, abstractmethod
 
 class Atom(metaclass=ABCMeta):
 
-    def __init__(self, element, name, coords=(0., 0., 0.), identifier=None):
+    __n_atoms__ = 0
+
+    def __init__(self, element, name, coords=(np.nan, np.nan, np.nan)):
         self.element = element
         self.name = name
-        self.identifier = identifier
+        self._identifier = Atom.__n_atoms__
+        Atom.__n_atoms__ += 1
         self.bonded_atoms = list()
         self.coords = np.asarray(list(coords), dtype=np.float)
 
@@ -31,6 +34,21 @@ class Atom(metaclass=ABCMeta):
     def is_bonded(self, atom):
         return (atom in self.bonded_atoms)
 
+    @property
+    def x(self):
+        return self.coords[0]
+
+    @property
+    def y(self):
+        return self.coords[1]
+
+    @property
+    def z(self):
+        return self.coords[2]
+
+    def __hash__(self):
+        return self._identifier
+
     def __to_pdb__(self, serial, chain_id, res_seq):
         s = 'ATOM  '
         s += str(serial).rjust(5) + '  '
@@ -46,15 +64,3 @@ class Atom(metaclass=ABCMeta):
         s += self.element
         s += '\n'
         return s
-
-    @property
-    def x(self):
-        return self.coords[0]
-
-    @property
-    def y(self):
-        return self.coords[1]
-
-    @property
-    def z(self):
-        return self.coords[2]

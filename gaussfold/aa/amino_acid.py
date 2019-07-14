@@ -11,10 +11,12 @@ from abc import ABCMeta, abstractmethod
 
 class AminoAcid:
 
-    def __init__(self, aa_name, abbreviation, explicit_hydrogens=False):
+    def __init__(self, aa_name, abbreviation, explicit_hydrogens=False, c='CA'):
         self.aa_name = aa_name
         self.abbreviation = abbreviation
         self.explicit_hydrogens = explicit_hydrogens
+        self.c = c
+        assert(self.c in ['CA', 'CB'])
 
         self.atoms = list()
         self.bonds = list()
@@ -41,8 +43,13 @@ class AminoAcid:
 
         self.H = Hydrogen('H')
         self.add_atom(self.H)
-
         self.add_bond(Bond(self.H, self.CA))
+
+    def ref(self):
+        if self.c == 'CB' and hasattr(self, 'CB'):
+            return self.CB
+        else:
+            return self.CA
 
     def phi(self, left_atom):
         return self.dihedral_angle(
@@ -81,7 +88,7 @@ class AminoAcid:
         x = np.dot(nv1, nv2)
         y = np.dot(o1, nv2)
 
-        return np.arctan2(y, x)
+        return np.arctan2(y, x) * 180. / np.pi
 
     def add_atom(self, atom):
         assert(isinstance(atom, Atom))
@@ -93,7 +100,7 @@ class AminoAcid:
         assert(isinstance(bond, Bond))
         is_1_h = isinstance(bond.atom1, Hydrogen)
         is_2_h = isinstance(bond.atom2, Hydrogen)
-        if (not is_1_h) or (not is_2_h) or self.explicit_hydrogens:
+        if ((not is_1_h) and (not is_2_h)) or self.explicit_hydrogens:
             self.bonds.append(bond)
 
     def __to_pdb__(self, serial, chain_id, res_seq):

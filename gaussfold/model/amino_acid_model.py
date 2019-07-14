@@ -2,6 +2,8 @@
 # amino_acid_model.py
 # author : Antoine Passemiers
 
+from gaussfold.constraints.gaussian_constraint import GaussianConstraint
+
 import numpy as np
 import scipy.spatial
 
@@ -22,16 +24,59 @@ class AminoAcidModel:
     """
 
     def __init__(self, L):
+        self._constraints = list()
+        self._atom_to_id = dict()
+        self._id_to_atom = dict()
+        self._initialized = False
         self.L = L
-        self.mu = np.full((self.L, self.L), np.nan, dtype=np.float)
-        self.sigma = np.full((self.L, self.L), np.nan, dtype=np.float)
-        self.weights = np.ones((self.L, self.L), dtype=np.float)
-        self.triu_indices = np.triu_indices(self.L, k=-1)
-        self.tril_indices = np.tril_indices(self.L, k=0)
-        self.distances = np.empty((self.L, self.L), dtype=np.float)
-        self.weighted = False
+        self.mu = np.full((self.L + 1, self.L + 1), np.nan, dtype=np.float)
+        self.sigma = np.full((self.L + 1, self.L + 1), np.nan, dtype=np.float)
+        self.weights = np.ones((self.L + 1, self.L + 1), dtype=np.float)
+        self.triu_indices = np.triu_indices(self.L + 1, k=-1)
+        self.tril_indices = np.tril_indices(self.L + 1, k=0)
+        self.distances = np.empty((self.L + 1, self.L + 1), dtype=np.float)
+        self.weighted = False # TODO
 
-    def add_restraint(self, i, j, mu, sigma, weight=1.):
+    def add_constraint(self, constraint):
+        if constraint not in self._constraints:
+            self._constraints.append(constraint)
+        self._initialized = False
+
+    def initialize(self):
+        atoms = set()
+        atoms.add(GaussianConstraint.__CENTER_OF_MASS__)
+        for constraint in self._constraints:
+            for atom in constraint.atoms():
+                atoms.add(atom)
+        atoms = list(atoms)
+        self._atom_to_id = { atom: i for i, atom in enumerate(atoms) }
+        self._id_to_atom = { i: atom for i, atom in enumerate(atoms) }
+
+        for constraint in self._constraints:
+            atom_a, atom_b = constraint.atoms()
+            i = self._atom_to_id[atom_a]
+            j = self._atom_to_id[atom_b]
+            mu = constraint.mu()
+            sigma = constraint.sigma()
+            weight = constraint.weight()
+            self._add_restraint(i, j, mu, sigma, weight=weight)
+
+        self._initialized = True
+        return self
+
+    def set_coords(self, coords):
+        for i in range(self.L + 1):
+            atom = self._id_to_atom[i]
+            atom.set_coords(*coords[i])
+
+    def get_coords(self):
+        assert(self._initialized)
+        coords = np.empty((self.L + 1, 3), dtype=np.float)
+        for i in range(self.L + 1):
+            coords[i, :] = self._id_to_atom[i].get_coords()
+        return np.nan_to_num(coords)
+
+    def _add_restraint(self, i, j, mu, sigma, weight=1.):
         """Adds Gaussian restraint to the model.
 
         Parameters:
@@ -86,7 +131,6 @@ class AminoAcidModel:
         scipy.spatial.distance.cdist(coords, coords, metric='euclidean', out=self.distances)
         D = self.distances
         M, S = self.mu, self.sigma
-
 
         X = np.tile(coords, (L, 1, 1))
         delta = X - np.transpose(X, (1, 0, 2))

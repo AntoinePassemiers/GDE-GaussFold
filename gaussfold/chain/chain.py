@@ -12,8 +12,10 @@ import numpy as np
 
 class Chain:
 
-    def __init__(self):
+    def __init__(self, c='CA'):
         self.amino_acids = list()
+        assert(c in ['CA', 'CB'])
+        self.c = c
 
     def update(self):
         identifier = 0
@@ -23,6 +25,7 @@ class Chain:
                 identifier += 1
 
     def add(self, amino_acid):
+        amino_acid.c = self.c
         if len(self.amino_acids) > 0:
             peptide_bond = Bond(self.amino_acids[-1].C, amino_acid.N)
             self.amino_acids[-1].add_bond(peptide_bond)
@@ -66,12 +69,13 @@ class Chain:
         return phi, psi
 
     @staticmethod
-    def from_string(s):
+    def from_string(s, c='CA'):
+        assert(c in ('CA', 'CB'))
         abb_to_clk = dict()
         for ckl in AminoAcid.__subclasses__():
-            abb_to_clk[ckl().abbreviation] = ckl
+            abb_to_clk[ckl(c=c).abbreviation] = ckl
 
-        chain = Chain()
+        chain = Chain(c=c)
         for c in s:
             chain.add(abb_to_clk[c]())
         return chain

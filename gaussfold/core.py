@@ -4,9 +4,9 @@
 
 from gaussfold.aa import Glycine
 from gaussfold.chain.chain import Chain
+from gaussfold.constraints import *
 from gaussfold.corrector import DeviationCorrector
 from gaussfold.graph import Graph
-from gaussfold.metrics import tm_score
 from gaussfold.model.amino_acid_model import AminoAcidModel
 from gaussfold.model.all_atom_model import AllAtomModel
 from gaussfold.optimizer import Optimizer
@@ -30,16 +30,15 @@ class GaussFold:
             Scaling algorithm.
     """
 
-    def __init__(self, sep=1, n_init_sols=20, n_runs=1, max_n_iter=300, eps=1e-3):
+    def __init__(self, sep=1, n_runs=1, max_n_iter=300, eps=1e-3):
         self.sep = sep
-        self.n_init_sols = n_init_sols
         self.n_runs = n_runs
         self.max_n_iter = max_n_iter
         self.eps = eps
         self._model = None
         self._optimizer = None
 
-    def run(self, cmap, ssp, seq, verbose=True):
+    def run(self, cmap, ssp, acc, seq, verbose=True):
         """Runs GDE-GaussFold algorithm.
 
         Parameters:
@@ -49,6 +48,9 @@ class GaussFold:
             ssp (:obj:`np.ndarray`): Array of shape (L,) representing
                 3-state secondary structure prediction.
                 0 stands for 'H', 1 for 'E' and 2 for 'C'.
+            acc (:obj:`np.ndarray`): Array of shape (L,) representing
+                3-state solvent accessibility prediction.
+                0 stands for 'buried', 1 for 'medium' and 2 for 'exposed'.
             seq (str): Protein primary structure.
             verbose (bool): Whether to display messages in stdout.
 
@@ -115,47 +117,42 @@ class GaussFold:
         if verbose:
             print('Apply Multi-Dimensional Scaling algorithm')
 
-        init_solutions = list()
-        for k in range(self.n_init_sols):
-            # Multi-dimensional scaling to obtain approximate
-            # 3D coordinates
-            embedding = MDS(
-                    n_components=3,
-                    metric=True,
-                    n_init=self.n_runs,
-                    max_iter=self.max_n_iter,
-                    eps=self.eps,
-                    n_jobs=None,
-                    random_state=None,
-                    dissimilarity='precomputed')
-            X_transformed = embedding.fit_transform(distances)
+        # Multi-dimensional scaling to obtain approximate
+        # 3D coordinates
+        embedding = MDS(
+                n_components=3,
+                metric=True,
+                n_init=self.n_runs,
+                max_iter=self.max_n_iter,
+                eps=self.eps,
+                n_jobs=None,
+                random_state=None,
+                dissimilarity='precomputed')
+        X_transformed = embedding.fit_transform(distances)
 
-            # Apply correction on pairs of adjacent residues
-            # based on known C_alpha-C_alpha (or C_beta-C_beta) distance
+        # Apply correction on pairs of adjacent residues
+        # based on known C_alpha-C_alpha (or C_beta-C_beta) distance
+        if verbose:
+            print('Apply deviation correction')
+        corrector = DeviationCorrector(len(distances))
+        try:
+            X_transformed = corrector.fit_transform(X_transformed)
+        except np.linalg.linalg.LinAlgError:
             if verbose:
-                print('Apply deviation correction')
-            corrector = DeviationCorrector(len(distances))
-            try:
-                X_transformed = corrector.fit_transform(X_transformed)
-            except np.linalg.linalg.LinAlgError:
-                if verbose:
-                    print('[Warning] Invalid value encountered in deviation corrector')
-            except ValueError:
-                if verbose:
-                    print('[Warning] Invalid value encountered in deviation corrector')
-            init_solutions.append(X_transformed)
-
-        # Align all initial solution in 3D space
-        if len(init_solutions) > 1:
-            for i in range(1, len(init_solutions)):
-                init_solutions[i] = tm_score(
-                    init_solutions[i], init_solutions[0], return_coords=True)[1]
+                print('[Warning] Invalid value encountered in deviation corrector')
+        except ValueError:
+            if verbose:
+                print('[Warning] Invalid value encountered in deviation corrector')
+        initial_coords = X_transformed
 
         # Create Gaussian model if not set by the user
         if not isinstance(self._model, AminoAcidModel):
             if verbose:
                 print('Model not set by user. Creating model from scratch...')
-            self._model = self.create_model(gds, ssp, weights)
+            chain = Chain.from_string(seq, c='CA')
+            self._model = self.create_model(chain, gds, ssp, acc, weights)
+        for i in range(len(chain)):
+            chain[i].ref().set_coords(*initial_coords[i])
 
         # Create optimizer if not set by the user.
         # Use default hyper-parameters.
@@ -165,33 +162,13 @@ class GaussFold:
             self._optimizer = Optimizer()
         
         # Run optimizer on the Gaussian model
-        best_coords = self._optimizer.run(
-                init_solutions, self._model, verbose=verbose)
-
-
-        chain = Chain.from_string(seq)
-        model = self.create_all_atom_model(chain, gds, contact_threshold=threshold)
-
-        solution = list()
-        for k, amino_acid in enumerate(chain.amino_acids):
-            for _ in range(len(amino_acid.atoms)):
-                solution.append(best_coords[k, :])
-        solution = np.asarray(solution)
-
-        solutions = [solution]
-        optimizer = Optimizer(
-                pop_size=200, partition_size=80, n_iter=3000, init_std=10.,
-                mutation_rate=.5, mutation_std=0.5, use_lbfgs=False)
-        all_coords = optimizer.run(solutions, model)
-
-        best_coords = list()
-        for k in range(L):
-            i = (chain[k].CB if not isinstance(chain[k], Glycine) else chain[k].CA).identifier
-            best_coords.append(all_coords[i, :])
-        best_coords = np.asarray(best_coords)
+        self._optimizer.run(self._model, verbose=verbose)
+        best_coords = np.empty((len(chain), 3), dtype=np.float)
+        for i in range(len(chain)):
+            best_coords[i, :] = chain[i].ref().get_coords()
         return best_coords
 
-    def create_model(self, gds, ssp, weights):
+    def create_model(self, chain, gds, ssp, acc, weights):
         """Creates a Gaussian model for the protein.
 
         Parameters:
@@ -220,13 +197,6 @@ class GaussFold:
         # to be defined for each pair of residues before
         # optimizing this model.
         model = AminoAcidModel(L)
-
-        # Add backbone restraints:
-        # Restraints based on average
-        # C-alpha - C-alpha distance for residues
-        # with a sequence separation of 1.
-        for i in range(L - 1):
-            model.add_restraint(i, i + 1, 3.82, 0.39, weight=1.)
         
         # Add restraints based on graph distances:
         # either contacts or non-contacts.
@@ -235,13 +205,39 @@ class GaussFold:
                 if gds[i, j] > 0:
                     mu = gds[i, j] * 5.72
                     sigma = gds[i, j] * 1.34
-                    model.add_restraint(i, j, mu, sigma, weights[i, j])
+                    model.add_constraint(DistanceRestraint(
+                            chain[i].ref(), chain[j].ref(), mu, sigma, weight=weights[i, j]))
+
+        # Repulsion constraints
+        for i in range(L):
+            for j in range(i):
+                model.add_constraint(Repulsion(chain[i].ref(), chain[j].ref()))
+
+        # Surface accessibility
+        for i in range(L):
+            if acc[i] == 0:
+                model.add_constraint(Exterior(chain[i].ref()))
+            elif acc[i] == 2:
+                model.add_constraint(Interior(chain[i].ref()))
+
+        # Add backbone restraints:
+        # Restraints based on average
+        # C-alpha - C-alpha distance for residues
+        # with a sequence separation of 1.
+        for i in range(L - 1):
+            model.add_constraint(Adjacent(chain[i].ref(), chain[i + 1].ref(), 1))
+
+        # Next adjacent restraints
+        for i in range(L - 2):
+            model.add_constraint(Adjacent(chain[i].ref(), chain[i + 2].ref(), 2))
+        for i in range(L - 3):
+            model.add_constraint(Adjacent(chain[i].ref(), chain[i + 3].ref(), 3))
 
         # Regular contacts
         for i in range(L):
             for j in range(max(0, i-self.sep)):
                 if gds[i, j] == 1:
-                    model.add_restraint(i, j, 3.82, 0.35, weight=1.)
+                    model.add_constraint(DistanceRestraint(chain[i].ref(), chain[j].ref(), 3.82, 0.35))
 
         # Add restraints based on contacts in predicted
         # secondary structures
@@ -251,42 +247,41 @@ class GaussFold:
                     sep = np.abs(i - j)
                     if segment_ids[i] == segment_ids[j]:
                         if ssp[i] == 0: # Helix
-                            if sep == 1:
-                                model.add_restraint(i, j, 3.82, 0.35, weight=weights[i, j])
-                            elif sep == 2:
-                                model.add_restraint(i, j, 5.50, 0.52, weight=weights[i, j])
+                            if sep == 2:
+                                model.add_constraint(DistanceRestraint(
+                                        chain[i].ref(), chain[j].ref(), 5.48, 0.14, weight=weights[i, j]))
                             elif sep == 3:
-                                model.add_restraint(i, j, 5.33, 0.93, weight=weights[i, j])
+                                model.add_constraint(DistanceRestraint(
+                                        chain[i].ref(), chain[j].ref(), 5.20, 0.14, weight=weights[i, j]))
                             elif sep == 4:
-                                model.add_restraint(i, j, 6.42, 1.04, weight=weights[i, j])
+                                model.add_constraint(DistanceRestraint(
+                                        chain[i].ref(), chain[j].ref(), 6.28, 0.26, weight=weights[i, j]))
+                            elif sep == 5:
+                                model.add_constraint(DistanceRestraint(
+                                        chain[i].ref(), chain[j].ref(), 8.75, 0.26))
                         elif ssp[i] == 1: # Beta strand
-                            if sep == 1:
-                                model.add_restraint(i, j, 3.82, 0.28, weight=weights[i, j])
-                            elif sep == 2:
-                                model.add_restraint(i, j, 6.66, 0.30, weight=weights[i, j])
+                            if sep == 2:
+                                model.add_constraint(DistanceRestraint(
+                                        chain[i].ref(), chain[j].ref(), 6.74, 0.28, weight=weights[i, j]))
+                            elif sep == 3:
+                                model.add_constraint(DistanceRestraint(
+                                        chain[i].ref(), chain[j].ref(), 10.10, 0.32, weight=weights[i, j]))
+                            elif sep == 4:
+                                model.add_constraint(DistanceRestraint(
+                                        chain[i].ref(), chain[j].ref(), 13.30, 1.41, weight=weights[i, j]))
                     elif (ssp[i] == 0 and ssp[j] == 1) or (ssp[i] == 1 and ssp[j] == 0):
                         if sep >= 4: # Alpha/beta contact
-                            model.add_restraint(i, j, 6.05, 0.95, weight=weights[i, j])
+                            model.add_constraint(DistanceRestraint(
+                                    chain[i].ref(), chain[j].ref(), 6.05, 0.95, weight=weights[i, j]))
                     elif (ssp[i] == 0 and ssp[j] == 2) or (ssp[i] == 2 and ssp[j] == 0):
                         if sep >= 4: # Helix/coil contact
-                            model.add_restraint(i, j, 6.60, 0.92, weight=weights[i, j])
+                            model.add_constraint(DistanceRestraint(
+                                    chain[i].ref(), chain[j].ref(), 6.60, 0.92, weight=weights[i, j]))
                     elif (ssp[i] == 1 and ssp[j] == 2) or (ssp[i] == 2 and ssp[j] == 1):
                         if sep >= 4: # Beta/coil contact
-                            model.add_restraint(i, j, 6.44, 1.00, weight=weights[i, j])
-        return model
-
-    def create_all_atom_model(self, chain, gds, contact_threshold):
-        atoms = chain.atoms()
-        model = AllAtomModel(chain)
-
-        for i in range(len(chain)):
-            for j in range(max(0, i-self.sep)):
-                if gds[i, j] == 1: # Contact
-                    a = (chain[i].CB if not isinstance(chain[i], Glycine) else chain[i].CA).identifier
-                    b = (chain[j].CB if not isinstance(chain[j], Glycine) else chain[j].CA).identifier
-                    model.add_distance_restraint(a, b, lb=3.5, ub=8.) # TODO
-
-        return model
+                            model.add_constraint(DistanceRestraint(
+                                    chain[i].ref(), chain[j].ref(), 6.44, 1.00, weight=weights[i, j]))
+        return model.initialize()
 
     @property
     def model(self):

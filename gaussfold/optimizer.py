@@ -42,7 +42,7 @@ class Optimizer:
         self.use_lbfgs = use_lbfgs
         self.scores = list()
 
-    def random_sol(self, initial_solutions):
+    def random_sol(self, initial_coords):
         """Generates a random solution by adding Gaussian noise
         to an initial solution.
 
@@ -54,7 +54,6 @@ class Optimizer:
         Returns:
             :obj:`np.ndarray`: A new solution of the same shape.
         """
-        initial_coords = random.choice(initial_solutions)
         L = initial_coords.shape[0]
         offsets = np.random.normal(0., self.init_std, size=(L, 3))
         individual = initial_coords + offsets
@@ -120,7 +119,7 @@ class Optimizer:
         individual = self.cross_over(left_winner, right_winner)
         return self.mutate(individual)
 
-    def run(self, initial_solutions, model, verbose=True):
+    def run(self, model, verbose=True):
         """Run heuristic optimizer on an initial solution,
         with given objective function.
 
@@ -133,15 +132,16 @@ class Optimizer:
         """
         # Randomly initializes population and adds initial
         # solution to it
-        pop = [self.random_sol(initial_solutions) \
-                for i in range(self.pop_size-len(initial_solutions))]
-        pop += initial_solutions
+        initial_solution = model.get_coords()
+        pop = [self.random_sol(initial_solution) for i in range(self.pop_size-1)]
+        pop += [initial_solution]
         obj = model.evaluate
 
         # Set initial solution as the best one so far
         self.scores = list()
         best_score = -np.inf
         best_iteration = 0
+
 
         # Compute fitness functions on all individuals
         scores = np.asarray([obj(ind) for ind in pop])
@@ -152,7 +152,6 @@ class Optimizer:
             worst = np.argmin(scores)
             pop[worst][:] = new_ind
             scores[worst] = obj(new_ind)
-            print(scores[worst], k)
             assert(not np.isnan(scores[worst]))
 
             # Check if improvement
@@ -173,10 +172,12 @@ class Optimizer:
             if k - best_iteration >= self.early_stopping:
                 break
 
-        # Return best solution
+        # Fine-tune solution with L-BFGS
         best_coords = pop[np.argmax(scores)]
         if self.use_lbfgs:
             new_coords = lbfgs(best_coords, model, verbose=verbose)
             if obj(new_coords) > best_score:
                 best_coords = new_coords
-        return best_coords
+
+        # Update coordinates in model
+        model.set_coords(best_coords)

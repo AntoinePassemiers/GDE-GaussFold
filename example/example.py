@@ -28,6 +28,10 @@ if __name__ == '__main__':
     print(ssp)
     print('')
 
+    # Parse solvent accesibility probabilities
+    filepath = os.path.join(DATA_FOLDER, 'acc.txt')
+    acc = SS3Parser().parse(filepath).argmax(axis=1)
+
     # Parse native 3D structure from PDB file
     # Residue coordinates are based on C-alpha atoms
     sequence_name = '1DBRA'
@@ -42,12 +46,12 @@ if __name__ == '__main__':
     cmap = 1. / (1 + np.exp(distances - 8.))
 
     # Create GDE-GaussFold object
-    gf = GaussFold(n_init_sols=1)
+    gf = GaussFold()
 
     # Set optimizer hyper-parameters (optional)
     gf.optimizer = Optimizer(
         pop_size=2000,       # Population size
-        n_iter=10000,        # Maximum number of iterations
+        n_iter=50000,        # Maximum number of iterations
         partition_size=50,   # Partition size for the selection of parents
         mutation_rate=0.5,   # Percentage of child's points to be mutated
         mutation_std=0.3,    # Stdv of mutation noise
@@ -55,7 +59,7 @@ if __name__ == '__main__':
         early_stopping=5000) # Maximum number of iterations without improvement
 
     # Run GDE-GaussFold
-    coords_predicted = gf.run(cmap, ssp, sequence, verbose=True)
+    coords_predicted = gf.run(cmap, ssp, acc, sequence, verbose=True)
 
     import numpy as np
     import matplotlib as mpl
