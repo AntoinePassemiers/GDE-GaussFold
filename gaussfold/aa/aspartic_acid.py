@@ -3,7 +3,7 @@
 # author : Antoine Passemiers
 
 from gaussfold.aa.amino_acid import AminoAcid
-from gaussfold.atom import Bond, Carbon, Hydrogen, Oxygen
+from gaussfold.atom import Bond, Group, Carbon, Hydrogen, Oxygen
 
 
 class AsparticAcid(AminoAcid):
@@ -13,17 +13,23 @@ class AsparticAcid(AminoAcid):
 
         # Add side chain atoms
 
-        self.CB = Carbon('CB')
+        self.ASP_group = Group('ASP')
+
+        self.CB = Carbon('CB', q=-0.20)
         self.add_atom(self.CB)
+        self.ASP_group.add(self.CB)
 
-        self.CG = Carbon('CG')
+        self.CG = Carbon('CG', q=0.34)
         self.add_atom(self.CG)
+        self.ASP_group.add(self.CG)
 
-        self.OD1 = Oxygen('OD1')
+        self.OD1 = Oxygen('OD1', q=-0.57)
         self.add_atom(self.OD1)
+        self.ASP_group.add(self.OD1)
 
-        self.OD2 = Oxygen('OD2')
+        self.OD2 = Oxygen('OD2', q=-0.57)
         self.add_atom(self.OD2)
+        self.ASP_group.add(self.OD2)
 
         self.add_bond(Bond(self.CB, self.CA))
         self.add_bond(Bond(self.CG, self.CB))

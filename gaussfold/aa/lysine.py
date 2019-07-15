@@ -3,7 +3,7 @@
 # author : Antoine Passemiers
 
 from gaussfold.aa.amino_acid import AminoAcid
-from gaussfold.atom import Bond, Carbon, Hydrogen, Nitrogen
+from gaussfold.atom import Bond, Group, Carbon, Hydrogen, Nitrogen
 
 
 class Lysine(AminoAcid):
@@ -13,20 +13,25 @@ class Lysine(AminoAcid):
 
         # Add side chain atoms
 
+        self.LYS_group = Group('LYS')
+
         self.CB = Carbon('CB')
         self.add_atom(self.CB)
 
         self.CG = Carbon('CG')
         self.add_atom(self.CG)
 
-        self.CD = Carbon('CD')
+        self.CD = Carbon('CD', q=0.12)
         self.add_atom(self.CD)
+        self.LYS_group.add(self.CD)
 
-        self.CE = Carbon('CE')
+        self.CE = Carbon('CE', q=0.30)
         self.add_atom(self.CE)
+        self.LYS_group.add(self.CE)
 
-        self.NZ = Nitrogen('NZ')
+        self.NZ = Nitrogen('NZ', q=-0.50)
         self.add_atom(self.NZ)
+        self.LYS_group.add(self.NZ)
 
         self.add_bond(Bond(self.CB, self.CA))
         self.add_bond(Bond(self.CG, self.CB))
@@ -68,10 +73,12 @@ class Lysine(AminoAcid):
         self.add_atom(self.H8)
         self.add_bond(Bond(self.H8, self.CE))
 
-        self.H9 = Hydrogen('H9')
-        self.add_atom(self.H9)
-        self.add_bond(Bond(self.H9, self.NZ))
+        self.HZA = Hydrogen('HZA', q=0.36)
+        self.add_atom(self.HZA)
+        self.add_bond(Bond(self.HZA, self.NZ))
+        self.LYS_group.add(self.HZA)
 
-        self.H10 = Hydrogen('H10')
-        self.add_atom(self.H10)
-        self.add_bond(Bond(self.H10, self.NZ))
+        self.HZB = Hydrogen('HZB', q=0.36)
+        self.add_atom(self.HZB)
+        self.add_bond(Bond(self.HZB, self.NZ))
+        self.LYS_group.add(self.HZB)

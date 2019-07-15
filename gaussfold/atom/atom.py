@@ -2,6 +2,8 @@
 # atom.py: Base class for atoms
 # author : Antoine Passemiers
 
+from gaussfold.atom.group import Group
+
 import numpy as np
 from abc import ABCMeta, abstractmethod
 
@@ -10,13 +12,17 @@ class Atom(metaclass=ABCMeta):
 
     __n_atoms__ = 0
 
-    def __init__(self, element, name, coords=(np.nan, np.nan, np.nan)):
+    def __init__(self, element, name, coords=(np.nan, np.nan, np.nan), q=0.):
         self.element = element
         self.name = name
         self._identifier = Atom.__n_atoms__
         Atom.__n_atoms__ += 1
         self.bonded_atoms = list()
         self.coords = np.asarray(list(coords), dtype=np.float)
+        self.charge = q
+        
+        self._group = Group(self.name)
+        self._group.add(self)
 
     def add_bonded_atom(self, atom):
         assert(isinstance(atom, Atom))

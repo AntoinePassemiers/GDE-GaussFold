@@ -2,7 +2,7 @@
 # amino_acid.py: Base class for amino acids
 # author : Antoine Passemiers
 
-from gaussfold.atom import Atom, Bond
+from gaussfold.atom import Atom, Bond, Group
 from gaussfold.atom import Carbon, Hydrogen, Oxygen, Nitrogen
 
 import numpy as np
@@ -23,27 +23,38 @@ class AminoAcid:
 
         # Define backbone atoms
 
-        self.N = Nitrogen('N')
+        self.NH_group = Group('NH')
+        self.CO_group = Group('CO')
+
+        self.N = Nitrogen('N', q=-0.28)
         self.add_atom(self.N)
+        self.NH_group.add(self.N)
 
         self.CA = Carbon('CA')
         self.add_atom(self.CA)
 
-        self.C = Carbon('C')
+        self.C = Carbon('C', q=0.38)
         self.add_atom(self.C)
+        self.CO_group.add(self.C)
 
-        self.O = Oxygen('O')
+        self.O = Oxygen('O', q=-0.38)
         self.add_atom(self.O)
+        self.CO_group.add(self.C)
 
         self.add_bond(Bond(self.N, self.CA))
         self.add_bond(Bond(self.CA, self.C))
         self.add_bond(Bond(self.C, self.O, order=2))
 
+        # TODO: N-terminus and C-terminus
+
         # Add hydrogen
 
-        self.H = Hydrogen('H')
-        self.add_atom(self.H)
-        self.add_bond(Bond(self.H, self.CA))
+        self.HN = Hydrogen('HN', q=0.28)
+        self.add_atom(self.HN)
+        self.add_bond(Bond(self.HN, self.CA))
+        self.NH_group.add(self.HN)
+
+        # TODO: N-terminus and C-terminus
 
     def ref(self):
         if self.c == 'CB' and hasattr(self, 'CB'):

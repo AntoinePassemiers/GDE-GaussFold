@@ -3,7 +3,7 @@
 # author : Antoine Passemiers
 
 from gaussfold.aa.amino_acid import AminoAcid
-from gaussfold.atom import Bond, Carbon, Hydrogen, Oxygen, Nitrogen
+from gaussfold.atom import Bond, Group, Carbon, Hydrogen, Oxygen, Nitrogen
 
 
 class Serine(AminoAcid):
@@ -13,11 +13,15 @@ class Serine(AminoAcid):
 
         # Add side chain atoms
 
-        self.CB = Carbon('CB')
-        self.add_atom(self.CB)
+        self.OGS_group = Group('OGS')
 
-        self.OG = Oxygen('OG')
+        self.CB = Carbon('CB', q=0.03)
+        self.add_atom(self.CB)
+        self.OGS_group.add(self.CB)
+
+        self.OG = Oxygen('OG', q=-0.38)
         self.add_atom(self.OG)
+        self.OGS_group.add(self.OG)
 
         self.add_bond(Bond(self.CB, self.CA))
         self.add_bond(Bond(self.CB, self.OG))
@@ -32,6 +36,7 @@ class Serine(AminoAcid):
         self.add_atom(self.H2)
         self.add_bond(Bond(self.H2, self.CB))
 
-        self.H3 = Hydrogen('H3')
-        self.add_atom(self.H3)
-        self.add_bond(Bond(self.H3, self.OG))
+        self.HOG = Hydrogen('HOG', q=-0.35)
+        self.add_atom(self.HOG)
+        self.add_bond(Bond(self.HOG, self.OG))
+        self.OGS_group.add(self.HOG)

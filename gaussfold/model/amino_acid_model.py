@@ -12,7 +12,6 @@ class AminoAcidModel:
     """Gaussian-restrained 3D model of a protein.
 
     Attributes:
-        L (int): Number of residues in the protein.
         mu (np.ndarray): Array of shape (L, L) where element (i, j)
             is the average expected distance between residues i and j.
         sigma (np.ndarray): Array of shape (L, L) where element (i, j)
@@ -23,19 +22,21 @@ class AminoAcidModel:
         weighted (bool): Whether restraints are weighted
     """
 
-    def __init__(self, L):
+    def __init__(self, weighted=False):
         self._constraints = list()
         self._atom_to_id = dict()
         self._id_to_atom = dict()
         self._initialized = False
-        self.L = L
-        self.mu = np.full((self.L + 1, self.L + 1), np.nan, dtype=np.float)
-        self.sigma = np.full((self.L + 1, self.L + 1), np.nan, dtype=np.float)
-        self.weights = np.ones((self.L + 1, self.L + 1), dtype=np.float)
-        self.triu_indices = np.triu_indices(self.L + 1, k=-1)
-        self.tril_indices = np.tril_indices(self.L + 1, k=0)
-        self.distances = np.empty((self.L + 1, self.L + 1), dtype=np.float)
-        self.weighted = False # TODO
+        self._weighted = weighted
+
+    def _initialize_matrices(self, n_atoms):
+        self._n_atoms = n_atoms
+        self._mu = np.full((n_atoms, n_atoms), np.nan, dtype=np.float)
+        self._sigma = np.full((n_atoms, n_atoms), np.nan, dtype=np.float)
+        self._weights = np.ones((n_atoms, n_atoms), dtype=np.float)
+        self._triu_indices = np.triu_indices(n_atoms, k=-1)
+        self._tril_indices = np.tril_indices(n_atoms, k=0)
+        self._distances = np.empty((n_atoms, n_atoms), dtype=np.float)
 
     def add_constraint(self, constraint):
         if constraint not in self._constraints:
@@ -52,6 +53,8 @@ class AminoAcidModel:
         self._atom_to_id = { atom: i for i, atom in enumerate(atoms) }
         self._id_to_atom = { i: atom for i, atom in enumerate(atoms) }
 
+        self._initialize_matrices(len(atoms))
+
         for constraint in self._constraints:
             atom_a, atom_b = constraint.atoms()
             i = self._atom_to_id[atom_a]
@@ -65,14 +68,14 @@ class AminoAcidModel:
         return self
 
     def set_coords(self, coords):
-        for i in range(self.L + 1):
+        for i in range(len(coords)):
             atom = self._id_to_atom[i]
             atom.set_coords(*coords[i])
 
     def get_coords(self):
         assert(self._initialized)
-        coords = np.empty((self.L + 1, 3), dtype=np.float)
-        for i in range(self.L + 1):
+        coords = np.empty((self._n_atoms, 3), dtype=np.float)
+        for i in range(self._n_atoms):
             coords[i, :] = self._id_to_atom[i].get_coords()
         return np.nan_to_num(coords)
 
@@ -86,11 +89,11 @@ class AminoAcidModel:
             sigma (float): Standard deviation of expected distance
             weight (float): Restraint weight in the log-likelihood
         """
-        self.mu[i, j] = self.mu[j, i] = mu
-        self.sigma[i, j] = self.sigma[j, i] = sigma
-        self.weights[i, j] = self.weights[j, i] = weight
+        self._mu[i, j] = self._mu[j, i] = mu
+        self._sigma[i, j] = self._sigma[j, i] = sigma
+        self._weights[i, j] = self._weights[j, i] = weight
         if weight != 1.:
-            self.weighted = True
+            self._weighted = True
 
     def evaluate(self, coords):
         """Computes log-likelihood given the Gaussian parameters `mu` and `sigma`.
@@ -102,16 +105,16 @@ class AminoAcidModel:
         Returns:
             float: Log-likelihood of the coordinates given the Gaussian parameters.
         """
-        scipy.spatial.distance.cdist(coords, coords, metric='euclidean', out=self.distances)
-        distances = self.distances[self.triu_indices]
-        mu, sigma = self.mu[self.triu_indices], self.sigma[self.triu_indices]
+        scipy.spatial.distance.cdist(coords, coords, metric='euclidean', out=self._distances)
+        distances = self._distances[self._triu_indices]
+        mu, sigma = self._mu[self._triu_indices], self._sigma[self._triu_indices]
 
         indices = ~np.isnan(mu)
         distances, mu, sigma = distances[indices], mu[indices], sigma[indices]
 
         logp = ((distances - mu) / sigma) ** 2.
-        if self.weighted:
-            weights = self.weights[self.triu_indices]
+        if self._weighted:
+            weights = self._weights[self._triu_indices]
             logp *= weights[indices]
         return -0.5 * logp.sum()
 
@@ -128,9 +131,9 @@ class AminoAcidModel:
                 with respect to 3D coordinates.
         """
         L = coords.shape[0]
-        scipy.spatial.distance.cdist(coords, coords, metric='euclidean', out=self.distances)
-        D = self.distances
-        M, S = self.mu, self.sigma
+        scipy.spatial.distance.cdist(coords, coords, metric='euclidean', out=self._distances)
+        D = self._distances
+        M, S = self._mu, self._sigma
 
         X = np.tile(coords, (L, 1, 1))
         delta = X - np.transpose(X, (1, 0, 2))
@@ -138,10 +141,10 @@ class AminoAcidModel:
         F = ((D - M) / (D * S ** 2.))[..., np.newaxis]
         F[np.isnan(F)] = 0
         grad = 4. * delta * F
-        grad[self.tril_indices] = 0
-        grad[np.isnan(self.mu)] = 0
+        grad[self._tril_indices] = 0
+        grad[np.isnan(self._mu)] = 0
 
-        if self.weighted:
+        if self._weighted:
             grad *= weights[..., np.newaxis]
         grad = np.nan_to_num(grad)
 

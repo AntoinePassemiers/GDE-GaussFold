@@ -90,3 +90,7 @@ class Chain:
 
     def __len__(self):
         return len(self.amino_acids)
+
+    def __iter__(self):
+        for amino_acid in self.amino_acids:
+            yield amino_acid

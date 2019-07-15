@@ -3,7 +3,7 @@
 # author : Antoine Passemiers
 
 from gaussfold.aa.amino_acid import AminoAcid
-from gaussfold.atom import Bond, Carbon, Hydrogen, Oxygen
+from gaussfold.atom import Bond, Group, Carbon, Hydrogen, Oxygen
 
 
 class GlutamicAcid(AminoAcid):
@@ -13,20 +13,26 @@ class GlutamicAcid(AminoAcid):
 
         # Add side chain atoms
 
+        self.GLU_group = Group('GLU')
+
         self.CB = Carbon('CB')
         self.add_atom(self.CB)
 
-        self.CG = Carbon('CG')
+        self.CG = Carbon('CG', q=-0.20)
         self.add_atom(self.CG)
+        self.GLU_group.add(self.CG)
 
-        self.CD = Carbon('CD')
+        self.CD = Carbon('CD', q=0.34)
         self.add_atom(self.CD)
+        self.GLU_group.add(self.CD)
 
-        self.OE1 = Oxygen('OE1')
+        self.OE1 = Oxygen('OE1', q=-0.57)
         self.add_atom(self.OE1)
+        self.GLU_group.add(self.OE1)
 
-        self.OE2 = Oxygen('OE2')
+        self.OE2 = Oxygen('OE2', q=-0.57)
         self.add_atom(self.OE2)
+        self.GLU_group.add(self.OE2)
 
         self.add_bond(Bond(self.CB, self.CA))
         self.add_bond(Bond(self.CG, self.CB))

@@ -3,7 +3,7 @@
 # author : Antoine Passemiers
 
 from gaussfold.aa.amino_acid import AminoAcid
-from gaussfold.atom import Bond, Carbon, Hydrogen, Nitrogen
+from gaussfold.atom import Bond, Group, Carbon, Hydrogen, Nitrogen
 
 
 class Arginine(AminoAcid):
@@ -13,26 +13,33 @@ class Arginine(AminoAcid):
 
         # Add side chain atoms
 
+        self.ARG_group = Group('ARG')
+
         self.CB = Carbon('CB')
         self.add_atom(self.CB)
 
         self.CG = Carbon('CG')
         self.add_atom(self.CG)
 
-        self.CD = Carbon('CD')
+        self.CD = Carbon('CD', q=0.19)
         self.add_atom(self.CD)
+        self.ARG_group.add(self.CD)
 
-        self.NE = Nitrogen('NE')
+        self.NE = Nitrogen('NE', q=-0.50)
         self.add_atom(self.NE)
+        self.ARG_group.add(self.NE)
 
-        self.CZ = Carbon('CZ')
+        self.CZ = Carbon('CZ', q=0.46)
         self.add_atom(self.CZ)
+        self.ARG_group.add(self.CZ)
 
-        self.NH1 = Nitrogen('NH1')
+        self.NH1 = Nitrogen('NH1', q=-0.50)
         self.add_atom(self.NH1)
+        self.ARG_group.add(self.NH1)
 
-        self.NH2 = Nitrogen('NH2')
+        self.NH2 = Nitrogen('NH2', q=-0.50)
         self.add_atom(self.NH2)
+        self.ARG_group.add(self.NH2)
 
         self.add_bond(Bond(self.CB, self.CA))
         self.add_bond(Bond(self.CB, self.CG))
@@ -68,18 +75,22 @@ class Arginine(AminoAcid):
         self.add_atom(self.H6)
         self.add_bond(Bond(self.H6, self.CD))
 
-        self.H7 = Hydrogen('H7')
-        self.add_atom(self.H7)
-        self.add_bond(Bond(self.H7, self.NE))
+        self.HNE = Hydrogen('HNE', q=0.37)
+        self.add_atom(self.HNE)
+        self.add_bond(Bond(self.HNE, self.NE))
+        self.ARG_group.add(self.HNE)
 
-        self.H8 = Hydrogen('H8')
-        self.add_atom(self.H8)
-        self.add_bond(Bond(self.H8, self.NH1))
+        self.HHA = Hydrogen('HHA', q=0.37)
+        self.add_atom(self.HHA)
+        self.add_bond(Bond(self.HHA, self.NH1))
+        self.ARG_group.add(self.HHA)
 
-        self.H9 = Hydrogen('H9')
-        self.add_atom(self.H9)
-        self.add_bond(Bond(self.H9, self.NH2))
+        self.HHB = Hydrogen('HHB', q=0.37)
+        self.add_atom(self.HHB)
+        self.add_bond(Bond(self.HHB, self.NH2))
+        self.ARG_group.add(self.HHB)
 
-        self.H10 = Hydrogen('H10')
-        self.add_atom(self.H10)
-        self.add_bond(Bond(self.H10, self.NH2))
+        self.HHC = Hydrogen('HHC', q=0.37)
+        self.add_atom(self.HHC)
+        self.add_bond(Bond(self.HHC, self.NH2))
+        self.ARG_group.add(self.HHC)

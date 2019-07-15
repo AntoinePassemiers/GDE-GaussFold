@@ -3,7 +3,7 @@
 # author : Antoine Passemiers
 
 from gaussfold.aa.amino_acid import AminoAcid
-from gaussfold.atom import Bond, Carbon, Hydrogen, Oxygen
+from gaussfold.atom import Bond, Group, Carbon, Hydrogen, Oxygen
 
 
 class Tyrosine(AminoAcid):
@@ -12,6 +12,8 @@ class Tyrosine(AminoAcid):
         AminoAcid.__init__(self, 'TYR', 'Y', **kwargs)
 
         # Add side chain atoms
+
+        self.OHH_group = Group('OHH')
 
         self.CB = Carbon('CB')
         self.add_atom(self.CB)
@@ -31,11 +33,13 @@ class Tyrosine(AminoAcid):
         self.CE2 = Carbon('CE2')
         self.add_atom(self.CE2)
 
-        self.CZ = Carbon('CZ')
+        self.CZ = Carbon('CZ', q=0.03)
         self.add_atom(self.CZ)
+        self.OHH_group.add(self.CZ)
 
-        self.OH = Oxygen('OH')
+        self.OH = Oxygen('OH', q=-0.38)
         self.add_atom(self.OH)
+        self.OHH_group.add(self.OH)
 
         self.add_bond(Bond(self.CB, self.CA))
         self.add_bond(Bond(self.CG, self.CB))
@@ -72,6 +76,7 @@ class Tyrosine(AminoAcid):
         self.add_atom(self.H6)
         self.add_bond(Bond(self.H6, self.CE2))
 
-        self.H7 = Hydrogen('H7')
-        self.add_atom(self.H7)
-        self.add_bond(Bond(self.H7, self.OH))
+        self.HOH = Hydrogen('HOH', q=0.35)
+        self.add_atom(self.HOH)
+        self.add_bond(Bond(self.HOH, self.OH))
+        self.OHH_group.add(self.HOH)

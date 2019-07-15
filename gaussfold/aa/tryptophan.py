@@ -3,7 +3,7 @@
 # author : Antoine Passemiers
 
 from gaussfold.aa.amino_acid import AminoAcid
-from gaussfold.atom import Bond, Carbon, Hydrogen, Nitrogen
+from gaussfold.atom import Bond, Group, Carbon, Hydrogen, Nitrogen
 
 
 class Tryptophan(AminoAcid):
@@ -12,6 +12,8 @@ class Tryptophan(AminoAcid):
         AminoAcid.__init__(self, 'TRP', 'W', **kwargs)
 
         # Add side chain atoms
+
+        self.NEH_group = Group('NEH')
 
         self.CB = Carbon('CB')
         self.add_atom(self.CB)
@@ -25,8 +27,9 @@ class Tryptophan(AminoAcid):
         self.CD2 = Carbon('CD2')
         self.add_atom(self.CD2)
 
-        self.NE1 = Nitrogen('NE1')
+        self.NE1 = Nitrogen('NE1', q=-0.28)
         self.add_atom(self.NE1)
+        self.NEH_group.add(self.NE1)
 
         self.CE2 = Carbon('CE2')
         self.add_atom(self.CE2)
@@ -70,9 +73,10 @@ class Tryptophan(AminoAcid):
         self.add_atom(self.H3)
         self.add_bond(Bond(self.H3, self.CD1))
 
-        self.H4 = Hydrogen('H4')
-        self.add_atom(self.H4)
-        self.add_bond(Bond(self.H4, self.NE1))
+        self.HNE = Hydrogen('HNE', q=0.28)
+        self.add_atom(self.HNE)
+        self.add_bond(Bond(self.HNE, self.NE1))
+        self.NEH_group.add(self.HNE)
 
         self.H5 = Hydrogen('H5')
         self.add_atom(self.H5)

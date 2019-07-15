@@ -2,7 +2,7 @@
 # example.py: GDE-GaussFold example
 # author : Antoine Passemiers
 
-from gaussfold import GaussFold, Optimizer, tm_score
+from gaussfold import GaussFold, Optimizer, tm_score, rmsd
 from gaussfold import PDBParser, SS3Parser, FastaParser, ContactParser
 
 import os
@@ -34,7 +34,7 @@ if __name__ == '__main__':
 
     # Parse native 3D structure from PDB file
     # Residue coordinates are based on C-alpha atoms
-    sequence_name = '1DBRA'
+    sequence_name = 'T0766-D1 '
     filepath = os.path.join(DATA_FOLDER, 'native.pdb')
     parser = PDBParser(sequence, sequence_name, method='CA')
     distances, coords_target = parser.parse(filepath)
@@ -42,8 +42,7 @@ if __name__ == '__main__':
     # Parse predicted contact probabilities
     L = len(sequence) # Number of residues
     filepath = os.path.join(DATA_FOLDER, 'predicted.con')
-    #cmap = ContactParser(L).parse(filepath)
-    cmap = 1. / (1 + np.exp(distances - 8.))
+    cmap = ContactParser(L, target_cols=[4]).parse(filepath)
 
     # Create GDE-GaussFold object
     gf = GaussFold()
@@ -74,9 +73,11 @@ if __name__ == '__main__':
 
     # Make 3D alignement between native structure and predicted structure
     # and compute TM-score
-    print('Compute TM-score')
+    print('Compute TM-score and RMSD')
     tm, coords_predicted = tm_score(coords_predicted, coords_target, return_coords=True)
     print('tm: ', tm)
+    r = rmsd(coords_predicted, coords_target, return_coords=False)
+    print('r: ', r)
 
 
     fig = plt.figure()

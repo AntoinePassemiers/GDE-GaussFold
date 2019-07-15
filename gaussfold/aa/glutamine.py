@@ -3,7 +3,7 @@
 # author : Antoine Passemiers
 
 from gaussfold.aa.amino_acid import AminoAcid
-from gaussfold.atom import Bond, Carbon, Hydrogen, Oxygen, Nitrogen
+from gaussfold.atom import Bond, Group, Carbon, Hydrogen, Oxygen, Nitrogen
 
 
 class Glutamine(AminoAcid):
@@ -13,20 +13,26 @@ class Glutamine(AminoAcid):
 
         # Add side chain atoms
 
+        self.COD_group = Group('COD')
+        self.NE2_group = Group('NE2')
+
         self.CB = Carbon('CB')
         self.add_atom(self.CB)
 
         self.CG = Carbon('CG')
         self.add_atom(self.CG)
 
-        self.CD = Carbon('CD')
+        self.CD = Carbon('CD', q=0.38)
         self.add_atom(self.CD)
+        self.COD_group.add(self.CD)
 
-        self.OE1 = Oxygen('OE1')
+        self.OE1 = Oxygen('OE1', q=-0.38)
         self.add_atom(self.OE1)
+        self.COD_group.add(self.OE1)
 
-        self.NE2 = Nitrogen('NE2')
+        self.NE2 = Nitrogen('NE2', q=-0.56)
         self.add_atom(self.NE2)
+        self.NE2_group.add(self.NE2)
 
         self.add_bond(Bond(self.CB, self.CA))
         self.add_bond(Bond(self.CG, self.CB))
@@ -52,10 +58,12 @@ class Glutamine(AminoAcid):
         self.add_atom(self.H4)
         self.add_bond(Bond(self.H4, self.CG))
 
-        self.H5 = Hydrogen('H5')
-        self.add_atom(self.H5)
-        self.add_bond(Bond(self.H5, self.NE2))
+        self.HNA = Hydrogen('HNA', q=0.28)
+        self.add_atom(self.HNA)
+        self.add_bond(Bond(self.HNA, self.NE2))
+        self.NE2_group.add(self.HNA)
 
-        self.H6 = Hydrogen('H6')
-        self.add_atom(self.H6)
-        self.add_bond(Bond(self.H6, self.NE2))
+        self.HNB = Hydrogen('HNB', q=0.28)
+        self.add_atom(self.HNB)
+        self.add_bond(Bond(self.HNB, self.NE2))
+        self.NE2_group.add(self.HNB)

@@ -11,7 +11,7 @@ class Adjacent(GaussianConstraint):
         GaussianConstraint.__init__(self, atom_a, atom_b, **kwargs)
         self._sep = sep
         if sep == 1:
-            self._mu, self._sigma = 3.82, 0.39
+            self._mu, self._sigma = 3.81, 0.39
         elif sep == 2:
             self._mu, self._sigma = 5.20, 0.55
         elif sep == 3:

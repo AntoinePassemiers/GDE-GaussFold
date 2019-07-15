@@ -3,7 +3,7 @@
 # author : Antoine Passemiers
 
 from gaussfold.aa.amino_acid import AminoAcid
-from gaussfold.atom import Bond, Carbon, Hydrogen, Oxygen, Nitrogen
+from gaussfold.atom import Bond, Group, Carbon, Hydrogen, Oxygen, Nitrogen
 
 
 class Proline(AminoAcid):
@@ -13,6 +13,10 @@ class Proline(AminoAcid):
 
         # Add side chain atoms
 
+        self.PRO_group = Group('PRO')
+        self.PRO_group.add(self.N)
+        self.PRO_group.add(self.CA)
+
         self.CB = Carbon('CB')
         self.add_atom(self.CB)
 
@@ -21,6 +25,7 @@ class Proline(AminoAcid):
 
         self.CD = Carbon('CD')
         self.add_atom(self.CD)
+        self.PRO_group.add(self.CD)
 
         self.add_bond(Bond(self.CB, self.CA))
         self.add_bond(Bond(self.CB, self.CG))
