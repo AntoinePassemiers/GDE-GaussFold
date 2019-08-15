@@ -30,13 +30,14 @@ class GaussFold:
             Scaling algorithm.
     """
 
-    def __init__(self, sep=1, n_runs=1, max_n_iter=300, eps=1e-3):
+    def __init__(self, sep=1, n_runs=1, max_n_iter=300, eps=1e-3, n_top=2.5):
         self.sep = sep
         self.n_runs = n_runs
         self.max_n_iter = max_n_iter
         self.eps = eps
         self._model = None
         self._optimizer = None
+        self._n_top = int(np.round(n_top))
 
     def run(self, cmap, ssp, acc, seq, verbose=True):
         """Runs GDE-GaussFold algorithm.
@@ -65,65 +66,79 @@ class GaussFold:
         cmap[np.isnan(cmap)] = 0.
         np.fill_diagonal(cmap, 0)
 
-        # Choose threshold such that exactly 4.5*L contacts
+        # Choose threshold such that exactly n_tops*L contacts
         # are obtained
         L = len(cmap)
+
+        """
+        mask = np.zeros((L, L), dtype=np.bool)
+        more_than_lb = np.tril_indices(L, 0)
+        mask[more_than_lb] = True
+        more_than_ub = np.tril_indices(L, -self.sep)
+        mask[more_than_ub] = False
+        mask = np.logical_or(mask, mask.T)
+        diag_cmap = np.copy(cmap)
+        diag_cmap[~mask] = 0
+
+        new_cmap = np.copy(cmap)
+        indices = np.triu_indices(L, -self.sep)
+        new_cmap[indices] = 0
+        cmap = new_cmap + new_cmap.T
+        proba = cmap[np.tril_indices(L, self.sep)]
+        proba.sort()
+        n_top = int(np.round(self._n_top * L))
+        threshold = proba[-n_top]
+        cmap += diag_cmap
+        cmap[np.arange(L - 1), np.arange(1, L)] = 1
+        cmap[np.arange(1, L), np.arange(L - 1)] = 1
+        """
         proba = cmap[np.triu_indices(L, -self.sep)]
         proba.sort()
-        n_top = int(np.round(2.5 * L))
+        n_top = int(np.round(self._n_top * L))
         threshold = proba[-n_top]
 
         A = (cmap > threshold)
 
         G = Graph(A)
         gds = G.distances()
-        missing = np.zeros(L, dtype=np.bool)
+        #missing = np.zeros(L, dtype=np.bool)
         
-        """
-        if not G.is_connected():
-            missing = (gds == 0).all(axis=0)
-            missing_idx = np.where(missing)[0]
-            connected_idx = np.random.choice(
-                    np.arange(L), size=len(missing_idx), replace=False)
-            A[missing_idx, connected_idx] = 1
-            A[connected_idx, missing_idx] = 1
+        while (not G.is_connected()) and n_top < 6.5 * L:
+            #missing = (gds == 0).all(axis=0)
+            #missing_idx = np.where(missing)[0]
+            #connected_idx = np.random.choice(
+            #        np.arange(L), size=len(missing_idx), replace=False)
+            #A[missing_idx, connected_idx] = 1
+            #A[connected_idx, missing_idx] = 1
+            #G = Graph(A)
+            #gds[missing_idx, :] = G.distances()[missing_idx, :]
+            #gds[:, missing_idx] = gds[missing_idx, :].T 
+            #missing_norm = gds[missing, :].mean()
+            #nonmissing_norm = gds[~missing, :].mean()
+            #gds = gds.astype(np.float)
+            #gds[missing_idx, :] *= (nonmissing_norm / missing_norm)
+            #gds[:, missing_idx] = gds[missing_idx, :].T
+            n_top += int(0.5 * L)
+            threshold = proba[-n_top]
+            print('[Warning] Disconnected graph. Retrying with %i top contacts.' % n_top)
+            A = (cmap > threshold)
             G = Graph(A)
-            gds[missing_idx, :] = G.distances()[missing_idx, :]
-            gds[:, missing_idx] = gds[missing_idx, :].T
-            missing_norm = gds[missing, :].mean()
-            nonmissing_norm = gds[~missing, :].mean()
-            gds = gds.astype(np.float)
-            gds[missing_idx, :] *= (nonmissing_norm / missing_norm)
-            gds[:, missing_idx] = gds[missing_idx, :].T
-        """
-        
+            gds = G.distances()
 
         # Compute confidence indexes
         #weights = cmap - threshold
         #weights[weights < 0.] = 0.
         #weights /= np.max(weights)
         weights = np.ones((L, L), dtype=np.float)
-        weights[missing, :] = 0.
-        weights[:, missing] = 0.
+        #weights[missing, :] = 0.
+        #weights[:, missing] = 0.
 
         # Graph distances above 14 are statistically impossible
         gds = np.minimum(gds, 14)
 
-        """
-        while (gds == 14).any():
-            values = np.copy(cmap)
-            values[gds < 14] = 0
-            i, j = np.unravel_index(values.argmax(), values.shape)
-            A[i, j] = 1
-            G = Graph(A)
-            gds = G.distances()
-            gds = np.minimum(gds, 14)
-        """
-
         import matplotlib.pyplot as plt
         plt.imshow(gds)
         plt.show()
-        #import sys; sys.exit(0)
 
         # Apply theoretical linear correspondence between graph
         # distance and Angstroms distance based on statistical
@@ -132,11 +147,10 @@ class GaussFold:
         # The empirical value of 4.846 could be used as well.
         distances = gds * 5.72
 
-        if verbose:
-            print('Apply Multi-Dimensional Scaling algorithm')
-
         # Multi-dimensional scaling to obtain approximate
         # 3D coordinates
+        if verbose:
+            print('Apply Multi-Dimensional Scaling algorithm')
         embedding = MDS(
                 n_components=3,
                 metric=True,
@@ -184,6 +198,7 @@ class GaussFold:
         best_coords = np.empty((len(chain), 3), dtype=np.float)
         for i in range(len(chain)):
             best_coords[i, :] = chain[i].ref().get_coords()
+            print(chain[i].ref().__to_pdb__(i, ' ', i))
         return best_coords
 
     def create_model(self, chain, cmap, gds, ssp, acc, weights):
@@ -218,8 +233,18 @@ class GaussFold:
 
         # Repulsion constraints
         for i in range(L):
-            for j in range(max(0, i-self.sep)):
+            for j in range(i):
                 model.add_constraint(Repulsion(chain[i].ref(), chain[j].ref()))
+
+        # Add restraints based on graph distances:
+        # either contacts or non-contacts.
+        #for i in range(L):
+        #    for j in range(max(0, i-self.sep)):
+        #        if gds[i, j] > 0:
+        #            mu = gds[i, j] * 5.72
+        #            sigma = gds[i, j] * 1.34
+        #            model.add_constraint(DistanceRestraint(
+        #                    chain[i].ref(), chain[j].ref(), mu, sigma))
 
         # Surface accessibility
         for i in range(L):
@@ -253,55 +278,58 @@ class GaussFold:
 
         # Add restraints based on contacts in predicted
         # secondary structures
+
+        for i in range(L):
+            for j in range(max(0, i - 4)):
+                if gds[i, j] == 1: # Contact
+                    if segment_ids[i] != segment_ids[j]:
+                        if ssp[i] == 1 and ssp[j] == 1:
+                            model.add_constraint(DistanceRestraint(
+                                    chain[i].ref(), chain[j].ref(), 4.54, 0.32))
+                        elif (ssp[i] == 0 and ssp[j] == 1) or (ssp[i] == 1 and ssp[j] == 0):
+                            model.add_constraint(DistanceRestraint(
+                                    chain[i].ref(), chain[j].ref(), 6.05, 0.95))
+                        elif (ssp[i] == 0 and ssp[j] == 2) or (ssp[i] == 2 and ssp[j] == 0):
+                            model.add_constraint(DistanceRestraint(
+                                    chain[i].ref(), chain[j].ref(), 6.60, 0.92))
+                        elif (ssp[i] == 1 and ssp[j] == 2) or (ssp[i] == 2 and ssp[j] == 1):
+                            model.add_constraint(DistanceRestraint(
+                                    chain[i].ref(), chain[j].ref(), 6.44, 1.00))
+
         for i in range(L):
             for j in range(0, i):
                 sep = np.abs(i - j)
                 if segment_ids[i] == segment_ids[j]:
                     if ssp[i] == 0: # Helix
-                        if sep == 2:
+                        if sep == 1:
                             model.add_constraint(DistanceRestraint(
-                                    chain[i].ref(), chain[j].ref(), 5.48, 0.14, weight=weights[i, j]))
+                                    chain[i].ref(), chain[j].ref(), 3.82, 0.35))
+                        elif sep == 2:
+                            model.add_constraint(DistanceRestraint(
+                                    chain[i].ref(), chain[j].ref(), 5.48, 0.14))
                         elif sep == 3:
                             model.add_constraint(DistanceRestraint(
-                                    chain[i].ref(), chain[j].ref(), 5.20, 0.14, weight=weights[i, j]))
+                                    chain[i].ref(), chain[j].ref(), 5.20, 0.14))
                         elif sep == 4:
                             model.add_constraint(DistanceRestraint(
-                                    chain[i].ref(), chain[j].ref(), 6.28, 0.26, weight=weights[i, j]))
+                                    chain[i].ref(), chain[j].ref(), 6.28, 0.26))
                         elif sep == 5:
                             model.add_constraint(DistanceRestraint(
                                     chain[i].ref(), chain[j].ref(), 8.75, 0.26))
                     elif ssp[i] == 1: # Beta strand
-                        if sep == 2:
+                        if sep == 1:
                             model.add_constraint(DistanceRestraint(
-                                    chain[i].ref(), chain[j].ref(), 6.74, 0.28, weight=weights[i, j]))
+                                    chain[i].ref(), chain[j].ref(), 3.80, 0.28))
+                        elif sep == 2:
+                            model.add_constraint(DistanceRestraint(
+                                    chain[i].ref(), chain[j].ref(), 6.74, 0.28))
                         elif sep == 3:
                             model.add_constraint(DistanceRestraint(
-                                    chain[i].ref(), chain[j].ref(), 10.10, 0.32, weight=weights[i, j]))
+                                    chain[i].ref(), chain[j].ref(), 10.10, 0.32))
                         elif sep == 4:
                             model.add_constraint(DistanceRestraint(
-                                    chain[i].ref(), chain[j].ref(), 13.30, 1.41, weight=weights[i, j]))
+                                    chain[i].ref(), chain[j].ref(), 13.30, 1.41))
 
-        for i in range(L):
-            for j in range(i):
-                if gds[i, j] == 1: # Contact
-                    if segment_ids[i] == segment_ids[j]:
-                        sep = np.abs(i - j)
-                        if ssp[i] == 1 and ssp[j] == 1:
-                            if sep >= 4:
-                                model.add_constraint(DistanceRestraint(
-                                        chain[i].ref(), chain[j].ref(), 4.54, 0.32))
-                        elif (ssp[i] == 0 and ssp[j] == 1) or (ssp[i] == 1 and ssp[j] == 0):
-                            if sep >= 4: # Alpha/beta contact
-                                model.add_constraint(DistanceRestraint(
-                                        chain[i].ref(), chain[j].ref(), 6.05, 0.95, weight=weights[i, j]))
-                        elif (ssp[i] == 0 and ssp[j] == 2) or (ssp[i] == 2 and ssp[j] == 0):
-                            if sep >= 4: # Helix/coil contact
-                                model.add_constraint(DistanceRestraint(
-                                        chain[i].ref(), chain[j].ref(), 6.60, 0.92, weight=weights[i, j]))
-                        elif (ssp[i] == 1 and ssp[j] == 2) or (ssp[i] == 2 and ssp[j] == 1):
-                            if sep >= 4: # Beta/coil contact
-                                model.add_constraint(DistanceRestraint(
-                                        chain[i].ref(), chain[j].ref(), 6.44, 1.00, weight=weights[i, j]))
         return model.initialize()
 
     def make_disulfide_bonds(self, cmap, chain):

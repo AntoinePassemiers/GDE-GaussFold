@@ -9,7 +9,8 @@ import os
 import numpy as np
 
 
-DATA_FOLDER = 'data'
+DATA_FOLDER = '../../Wynona/data/additional_set/5DJEB'
+#DATA_FOLDER = 'data'
 
 
 if __name__ == '__main__':
@@ -34,18 +35,24 @@ if __name__ == '__main__':
 
     # Parse native 3D structure from PDB file
     # Residue coordinates are based on C-alpha atoms
-    sequence_name = 'T0766-D1 '
+    # Chain id is assumed to be the last letter of `sequence_name`
+    sequence_name = '1DRBA'
     filepath = os.path.join(DATA_FOLDER, 'native.pdb')
     parser = PDBParser(sequence, sequence_name, method='CA')
     distances, coords_target = parser.parse(filepath)
 
     # Parse predicted contact probabilities
     L = len(sequence) # Number of residues
-    filepath = os.path.join(DATA_FOLDER, 'predicted.con')
-    cmap = ContactParser(L, target_cols=[4]).parse(filepath)
+    filepath = os.path.join(DATA_FOLDER, 'psicov.out')
+    if os.path.exists(filepath):
+        cmap = ContactParser(L, target_cols=[4]).parse(filepath)
+    else:
+        filepath = os.path.join(DATA_FOLDER, 'dir.gaussdca')
+        cmap = ContactParser(L, target_cols=[2]).parse(filepath)
+    #cmap = 1. / (1 + np.exp(distances - 8.))
 
     # Create GDE-GaussFold object
-    gf = GaussFold()
+    gf = GaussFold(n_top=2.5)
 
     # Set optimizer hyper-parameters (optional)
     gf.optimizer = Optimizer(
@@ -74,7 +81,7 @@ if __name__ == '__main__':
     # Make 3D alignement between native structure and predicted structure
     # and compute TM-score
     print('Compute TM-score and RMSD')
-    tm, coords_predicted = tm_score(coords_predicted, coords_target, return_coords=True)
+    tm, coords_aligned = tm_score(coords_predicted, coords_target, return_coords=True)
     print('tm: ', tm)
     r = rmsd(coords_predicted, coords_target, return_coords=False)
     print('r: ', r)
@@ -87,9 +94,10 @@ if __name__ == '__main__':
     y = coords_target[:, 1]
     z = coords_target[:, 2]
     ax.plot(x, y, z)
-    x = coords_predicted[:, 0]
-    y = coords_predicted[:, 1]
-    z = coords_predicted[:, 2]
+    offset = 25
+    x = coords_aligned[:, 0] + offset
+    y = coords_aligned[:, 1] + offset
+    z = coords_aligned[:, 2] + offset
     ax.plot(x, y, z)
     ax.legend()
     plt.show()

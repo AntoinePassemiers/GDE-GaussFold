@@ -65,6 +65,7 @@ class AminoAcidModel:
             self._add_restraint(i, j, mu, sigma, weight=weight)
 
         self._initialized = True
+        self._weighted = False # TODO
         return self
 
     def set_coords(self, coords):
@@ -106,15 +107,15 @@ class AminoAcidModel:
             float: Log-likelihood of the coordinates given the Gaussian parameters.
         """
         scipy.spatial.distance.cdist(coords, coords, metric='euclidean', out=self._distances)
-        distances = self._distances[self._triu_indices]
-        mu, sigma = self._mu[self._triu_indices], self._sigma[self._triu_indices]
+        distances = self._distances[self._tril_indices]
+        mu, sigma = self._mu[self._tril_indices], self._sigma[self._tril_indices]
 
         indices = ~np.isnan(mu)
         distances, mu, sigma = distances[indices], mu[indices], sigma[indices]
 
         logp = ((distances - mu) / sigma) ** 2.
         if self._weighted:
-            weights = self._weights[self._triu_indices]
+            weights = self._weights[self._tril_indices]
             logp *= weights[indices]
         return -0.5 * logp.sum()
 
@@ -145,6 +146,7 @@ class AminoAcidModel:
         grad[np.isnan(self._mu)] = 0
 
         if self._weighted:
+            weights = self._weights[self._tril_indices]
             grad *= weights[..., np.newaxis]
         grad = np.nan_to_num(grad)
 
